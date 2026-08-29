@@ -54,6 +54,14 @@ export function AuthProvider({ children }) {
     return data;
   }, [persistToken]);
 
+  // ── loginWithData ────────────────────────────────────────────────
+  // Accepts an already-fetched auth payload (e.g. from the reset-password endpoint)
+  // and hydrates the auth context without making a second API call.
+  const loginWithData = useCallback((data) => {
+    persistToken(data.token);
+    setUser({ _id: data._id, name: data.name, email: data.email, role: data.role });
+  }, [persistToken]);
+
   // ── logout ─────────────────────────────────────────────────────────────────
   const logout = useCallback(async () => {
     try {
@@ -68,7 +76,7 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  const value = { user, token, login, register, logout, loading };
+  const value = { user, token, login, register, loginWithData, logout, loading };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

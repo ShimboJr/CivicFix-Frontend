@@ -3,11 +3,13 @@ import { AuthProvider }  from './context/AuthContext';
 import ProtectedRoute    from './components/ProtectedRoute';
 
 // Public pages
-import Home          from './pages/Home';
-import Login         from './pages/Login';
-import Register      from './pages/Register';
-import CommunityMap  from './pages/CommunityMap';
-import PublicIssues  from './pages/PublicIssues';
+import Home           from './pages/Home';
+import Login          from './pages/Login';
+import Register       from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword  from './pages/ResetPassword';
+import CommunityMap   from './pages/CommunityMap';
+import PublicIssues   from './pages/PublicIssues';
 
 // Resident pages
 import ResidentDashboard from './pages/ResidentDashboard';
@@ -38,6 +40,8 @@ export default function App() {
           <Route path="/"         element={<Home />} />
           <Route path="/login"    element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password"          element={<ForgotPassword />} />
+          <Route path="/reset-password/:token"    element={<ResetPassword />} />
           <Route path="/map"      element={<CommunityMap />} />
           <Route path="/issues"   element={<PublicIssues />} />
 

@@ -102,7 +102,7 @@ export default function Login() {
           <div style={{ marginBottom: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <label htmlFor="login-password" className="cf-form-label">Password</label>
-              <a href="#" style={{ fontSize: '0.8rem' }}>Forgot password?</a>
+              <Link to="/forgot-password" style={{ fontSize: '0.8rem' }}>Forgot password?</Link>
             </div>
             <input
               id="login-password"
