@@ -11,6 +11,11 @@ const SEVERITY_COLOR = {
   Low: '#10b981', Medium: '#f59e0b', High: '#f97316', Critical: '#ef4444',
 };
 
+// Cloudinary URLs are already fully-qualified (https://…).
+// Only prepend the local dev server origin for legacy /uploads/… paths.
+const resolveImg = (src) =>
+  src?.startsWith('http') ? src : `http://localhost:5000${src}`;
+
 function formatDate(d) {
   return new Date(d).toLocaleDateString('en-GB', {
     day: 'numeric', month: 'long', year: 'numeric',
@@ -178,9 +183,9 @@ export default function IssueDetail() {
                 {issue.images.map((src, i) => (
                   <img
                     key={i}
-                    src={`http://localhost:5000${src}`}
+                    src={resolveImg(src)}
                     alt={`Issue photo ${i + 1}`}
-                    onClick={() => setLightbox(`http://localhost:5000${src}`)}
+                    onClick={() => setLightbox(resolveImg(src))}
                     style={{
                       width: 110, height: 90, objectFit: 'cover',
                       borderRadius: 'var(--cf-radius-md)', cursor: 'zoom-in',
@@ -209,9 +214,9 @@ export default function IssueDetail() {
                       {label}
                     </p>
                     <img
-                      src={`http://localhost:5000${src}`}
+                      src={resolveImg(src)}
                       alt={label}
-                      onClick={() => setLightbox(`http://localhost:5000${src}`)}
+                      onClick={() => setLightbox(resolveImg(src))}
                       style={{ width: '100%', height: 160, objectFit: 'cover', borderRadius: 'var(--cf-radius-md)', cursor: 'zoom-in', border: '1px solid var(--cf-border)' }}
                     />
                   </div>

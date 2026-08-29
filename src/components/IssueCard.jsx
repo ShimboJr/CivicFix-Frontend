@@ -22,9 +22,12 @@ export default function IssueCard({ issue }) {
     createdAt,
   } = issue;
 
-  const thumbnail  = images && images.length > 0
-    ? `http://localhost:5000${images[0]}`
-    : null;
+  // Cloudinary URLs are already fully-qualified (https://…); only prepend the
+  // local server origin for legacy records that still hold a /uploads/… path.
+  const resolveImg = (src) =>
+    src?.startsWith('http') ? src : `http://localhost:5000${src}`;
+
+  const thumbnail = images?.length > 0 ? resolveImg(images[0]) : null;
 
   const categoryIcon = category?.icon || 'bi-tag';
   const categoryName = category?.name || 'Uncategorized';

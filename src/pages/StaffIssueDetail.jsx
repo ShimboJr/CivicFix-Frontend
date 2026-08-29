@@ -19,6 +19,11 @@ function formatDate(d) {
 
 const SEVERITY_COLOR = { Low: '#10b981', Medium: '#f59e0b', High: '#f97316', Critical: '#ef4444' };
 
+// Cloudinary URLs are already fully-qualified (https://…).
+// Only prepend the local dev server origin for legacy /uploads/… paths.
+const resolveImg = (src) =>
+  src?.startsWith('http') ? src : `http://localhost:5000${src}`;
+
 export default function StaffIssueDetail() {
   const { id }     = useParams();
   const navigate   = useNavigate();
@@ -183,8 +188,8 @@ export default function StaffIssueDetail() {
               </h2>
               <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
                 {issue.images.map((src, i) => (
-                  <img key={i} src={`http://localhost:5000${src}`} alt={`Photo ${i + 1}`}
-                    onClick={() => setLightbox(`http://localhost:5000${src}`)}
+                  <img key={i} src={resolveImg(src)} alt={`Photo ${i + 1}`}
+                    onClick={() => setLightbox(resolveImg(src))}
                     style={{ width: 110, height: 90, objectFit: 'cover', borderRadius: 'var(--cf-radius-md)', cursor: 'zoom-in', border: '1px solid var(--cf-border)' }} />
                 ))}
               </div>
@@ -201,8 +206,8 @@ export default function StaffIssueDetail() {
                 {[['Before', issue.beforeImage], ['After', issue.afterImage]].map(([label, src]) => (
                   <div key={label}>
                     <p style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--cf-text-secondary)', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</p>
-                    <img src={`http://localhost:5000${src}`} alt={label}
-                      onClick={() => setLightbox(`http://localhost:5000${src}`)}
+                    <img src={resolveImg(src)} alt={label}
+                      onClick={() => setLightbox(resolveImg(src))}
                       style={{ width: '100%', height: 160, objectFit: 'cover', borderRadius: 'var(--cf-radius-md)', cursor: 'zoom-in', border: '1px solid var(--cf-border)' }} />
                   </div>
                 ))}
