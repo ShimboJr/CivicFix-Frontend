@@ -1,0 +1,380 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   CivicFix — Global Design System
+   All colours, spacing, and typography are defined here as CSS custom
+   properties so every component can reference them consistently.
+───────────────────────────────────────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=DM+Sans:wght@400;500;600&display=swap');
+
+/* ── Colour Tokens ──────────────────────────────────────────────────────────── */
+:root {
+  /* Primary — deep civic teal */
+  --cf-primary:        #0B4F6C;
+  --cf-primary-dark:   #083a52;
+  --cf-primary-light:  #d6eaf3;
+
+  /* Accent — warm amber (CTAs, highlights, badges) */
+  --cf-accent:         #F2A541;
+  --cf-accent-dark:    #d4882a;
+  --cf-accent-light:   #fef3e2;
+
+  /* Neutrals */
+  --cf-bg:             #f5f6f8;
+  --cf-surface:        #ffffff;
+  --cf-border:         #dee2e6;
+  --cf-border-light:   #edf0f3;
+
+  /* Text */
+  --cf-text:           #1a202c;
+  --cf-text-secondary: #6b7280;
+  --cf-text-muted:     #9ca3af;
+
+  /* Status colours (flat, no gradient) */
+  --cf-status-pending:     #f59e0b;
+  --cf-status-review:      #3b82f6;
+  --cf-status-assigned:    #8b5cf6;
+  --cf-status-inprogress:  #06b6d4;
+  --cf-status-resolved:    #10b981;
+  --cf-status-rejected:    #ef4444;
+
+  /* Severity colours */
+  --cf-sev-low:      #6ee7b7;
+  --cf-sev-medium:   #fcd34d;
+  --cf-sev-high:     #fb923c;
+  --cf-sev-critical: #f87171;
+
+  /* Spacing scale */
+  --cf-space-xs:  0.25rem;
+  --cf-space-sm:  0.5rem;
+  --cf-space-md:  1rem;
+  --cf-space-lg:  1.5rem;
+  --cf-space-xl:  2rem;
+  --cf-space-2xl: 3rem;
+
+  /* Typography */
+  --cf-font-body:    'Inter', system-ui, sans-serif;
+  --cf-font-heading: 'DM Sans', 'Inter', sans-serif;
+
+  /* Radius */
+  --cf-radius-sm:  4px;
+  --cf-radius-md:  8px;
+  --cf-radius-lg:  12px;
+  --cf-radius-xl:  16px;
+
+  /* Shadows — subtle, no colour tinting */
+  --cf-shadow-sm: 0 1px 3px rgba(0,0,0,.07), 0 1px 2px rgba(0,0,0,.05);
+  --cf-shadow-md: 0 4px 12px rgba(0,0,0,.08);
+  --cf-shadow-lg: 0 8px 24px rgba(0,0,0,.10);
+
+  /* Transition */
+  --cf-transition: 150ms ease;
+}
+
+/* ── Reset & Base ───────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin:           0;
+  font-family:      var(--cf-font-body);
+  font-size:        0.9375rem;
+  line-height:      1.6;
+  color:            var(--cf-text);
+  background-color: var(--cf-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--cf-font-heading);
+  font-weight: 600;
+  line-height: 1.25;
+  color:       var(--cf-text);
+  margin-top:  0;
+}
+
+a { color: var(--cf-primary); text-decoration: none; }
+a:hover { color: var(--cf-primary-dark); }
+
+img { max-width: 100%; display: block; }
+
+/* ── Bootstrap colour overrides — keep Bootstrap utility classes working ────── */
+:root {
+  --bs-primary:       #0B4F6C;
+  --bs-primary-rgb:   11, 79, 108;
+  --bs-link-color:    #0B4F6C;
+}
+
+.btn-primary {
+  background-color: var(--cf-primary) !important;
+  border-color:     var(--cf-primary) !important;
+  color:            #fff !important;
+}
+.btn-primary:hover,
+.btn-primary:focus {
+  background-color: var(--cf-primary-dark) !important;
+  border-color:     var(--cf-primary-dark) !important;
+}
+
+.btn-accent {
+  background-color: var(--cf-accent);
+  border-color:     var(--cf-accent);
+  color:            #fff;
+  font-weight:      600;
+}
+.btn-accent:hover,
+.btn-accent:focus {
+  background-color: var(--cf-accent-dark);
+  border-color:     var(--cf-accent-dark);
+  color:            #fff;
+}
+
+/* ── Layout Helpers ─────────────────────────────────────────────────────────── */
+.cf-page-center {
+  min-height:      100vh;
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  padding:         var(--cf-space-lg);
+  background-color: var(--cf-bg);
+}
+
+.cf-card {
+  background:    var(--cf-surface);
+  border:        1px solid var(--cf-border-light);
+  border-radius: var(--cf-radius-lg);
+  box-shadow:    var(--cf-shadow-md);
+  padding:       var(--cf-space-xl) var(--cf-space-xl);
+}
+
+/* ── Auth Card ──────────────────────────────────────────────────────────────── */
+.cf-auth-card {
+  width:     100%;
+  max-width: 420px;
+}
+
+.cf-auth-logo {
+  display:         flex;
+  align-items:     center;
+  gap:             var(--cf-space-sm);
+  margin-bottom:   var(--cf-space-xl);
+  justify-content: center;
+}
+
+.cf-auth-logo .logo-icon {
+  width:           40px;
+  height:          40px;
+  background:      var(--cf-primary);
+  border-radius:   var(--cf-radius-md);
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  color:           white;
+  font-size:       1.2rem;
+}
+
+.cf-auth-logo .logo-text {
+  font-family: var(--cf-font-heading);
+  font-weight: 700;
+  font-size:   1.4rem;
+  color:       var(--cf-primary);
+  letter-spacing: -0.3px;
+}
+
+.cf-auth-logo .logo-text span {
+  color: var(--cf-accent);
+}
+
+.cf-form-label {
+  font-size:   0.8125rem;
+  font-weight: 600;
+  color:       var(--cf-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.3rem;
+}
+
+.cf-input {
+  width:         100%;
+  padding:       0.6rem 0.85rem;
+  border:        1.5px solid var(--cf-border);
+  border-radius: var(--cf-radius-md);
+  font-size:     0.9375rem;
+  font-family:   var(--cf-font-body);
+  color:         var(--cf-text);
+  background:    var(--cf-surface);
+  transition:    border-color var(--cf-transition), box-shadow var(--cf-transition);
+  outline:       none;
+}
+
+.cf-input:focus {
+  border-color: var(--cf-primary);
+  box-shadow:   0 0 0 3px rgba(11, 79, 108, 0.12);
+}
+
+.cf-input.is-invalid {
+  border-color: var(--cf-status-rejected);
+}
+
+.cf-input.is-invalid:focus {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+}
+
+.cf-field-error {
+  font-size:  0.8125rem;
+  color:      var(--cf-status-rejected);
+  margin-top: 0.25rem;
+}
+
+.cf-btn {
+  display:         inline-flex;
+  align-items:     center;
+  justify-content: center;
+  gap:             0.4rem;
+  padding:         0.65rem 1.25rem;
+  border-radius:   var(--cf-radius-md);
+  font-size:       0.9375rem;
+  font-weight:     600;
+  font-family:     var(--cf-font-body);
+  border:          none;
+  cursor:          pointer;
+  transition:      background-color var(--cf-transition), box-shadow var(--cf-transition);
+  white-space:     nowrap;
+}
+
+.cf-btn:disabled {
+  opacity: 0.6;
+  cursor:  not-allowed;
+}
+
+.cf-btn-primary {
+  background: var(--cf-primary);
+  color:      #fff;
+}
+.cf-btn-primary:hover:not(:disabled) {
+  background: var(--cf-primary-dark);
+}
+
+.cf-btn-accent {
+  background: var(--cf-accent);
+  color:      #fff;
+}
+.cf-btn-accent:hover:not(:disabled) {
+  background: var(--cf-accent-dark);
+}
+
+.cf-btn-outline {
+  background:  transparent;
+  color:       var(--cf-primary);
+  border:      1.5px solid var(--cf-primary);
+}
+.cf-btn-outline:hover:not(:disabled) {
+  background: var(--cf-primary-light);
+}
+
+/* ── Status Badge ───────────────────────────────────────────────────────────── */
+.cf-badge {
+  display:       inline-flex;
+  align-items:   center;
+  gap:           0.25rem;
+  padding:       0.2rem 0.65rem;
+  border-radius: 999px;
+  font-size:     0.75rem;
+  font-weight:   600;
+  letter-spacing: 0.02em;
+}
+
+.cf-badge-pending     { background: #fef3c7; color: #92400e; }
+.cf-badge-review      { background: #dbeafe; color: #1e40af; }
+.cf-badge-assigned    { background: #ede9fe; color: #5b21b6; }
+.cf-badge-inprogress  { background: #cffafe; color: #0e7490; }
+.cf-badge-resolved    { background: #d1fae5; color: #065f46; }
+.cf-badge-rejected    { background: #fee2e2; color: #991b1b; }
+
+/* ── Spinner ────────────────────────────────────────────────────────────────── */
+.cf-spinner-wrap {
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  min-height:      100vh;
+}
+
+.cf-spinner {
+  width:        44px;
+  height:       44px;
+  border:       4px solid var(--cf-border);
+  border-top:   4px solid var(--cf-primary);
+  border-radius: 50%;
+  animation:    cf-spin 0.75s linear infinite;
+}
+
+@keyframes cf-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Alert ──────────────────────────────────────────────────────────────────── */
+.cf-alert {
+  padding:       0.8rem 1rem;
+  border-radius: var(--cf-radius-md);
+  font-size:     0.875rem;
+  display:       flex;
+  align-items:   flex-start;
+  gap:           0.5rem;
+}
+
+.cf-alert-error {
+  background: #fee2e2;
+  color:      #991b1b;
+  border-left: 3px solid var(--cf-status-rejected);
+}
+
+.cf-alert-success {
+  background: #d1fae5;
+  color:      #065f46;
+  border-left: 3px solid var(--cf-status-resolved);
+}
+
+/* ── Divider ────────────────────────────────────────────────────────────────── */
+.cf-divider {
+  display:      flex;
+  align-items:  center;
+  gap:          var(--cf-space-md);
+  margin:       var(--cf-space-lg) 0;
+  color:        var(--cf-text-muted);
+  font-size:    0.8125rem;
+}
+.cf-divider::before,
+.cf-divider::after {
+  content:    '';
+  flex:       1;
+  height:     1px;
+  background: var(--cf-border);
+}
+
+/* ── Placeholder page ───────────────────────────────────────────────────────── */
+.cf-placeholder {
+  display:         flex;
+  flex-direction:  column;
+  align-items:     center;
+  justify-content: center;
+  min-height:      100vh;
+  gap:             var(--cf-space-md);
+  color:           var(--cf-text-secondary);
+  text-align:      center;
+  padding:         var(--cf-space-xl);
+}
+
+.cf-placeholder i {
+  font-size: 3rem;
+  color:     var(--cf-primary-light);
+}
+
+/* ── Skeleton loader pulse ───────────────────────────────────────────────────── */
+@keyframes cf-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+
+/* ── Utility ────────────────────────────────────────────────────────────────── */
+.me-1 { margin-right: 0.25rem; }
+.me-2 { margin-right: 0.5rem; }
