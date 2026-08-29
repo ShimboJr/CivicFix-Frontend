@@ -154,10 +154,13 @@ export default function StaffIssueDetail() {
         <i className="bi bi-arrow-left"></i> Back to Assigned Issues
       </button>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '1.5rem', alignItems: 'start' }}>
+      {/* ── Two-column layout ───────────────────────────────────────────────
+           Below lg (<992 px): cols stack — right sidebar goes below the main content.
+           At lg+:             side-by-side at 8/4 col ratio. */}
+      <div className="row g-4 align-items-start">
 
-        {/* ── Left ──────────────────────────────────────────────────────── */}
-        <div>
+        {/* ── Left column (main content) ────────────────────────────────── */}
+        <div className="col-12 col-lg-8">
           {/* Issue header */}
           <div className="cf-card" style={{ marginBottom: '1rem' }}>
             <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.75rem', alignItems: 'center' }}>
@@ -187,10 +190,16 @@ export default function StaffIssueDetail() {
                 <i className="bi bi-images me-2" style={{ color: 'var(--cf-primary)' }}></i>Reporter's Photos
               </h2>
               <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-                {issue.images.map((src, i) => (
+                 {issue.images.map((src, i) => (
                   <img key={i} src={resolveImg(src)} alt={`Photo ${i + 1}`}
                     onClick={() => setLightbox(resolveImg(src))}
-                    style={{ width: 110, height: 90, objectFit: 'cover', borderRadius: 'var(--cf-radius-md)', cursor: 'zoom-in', border: '1px solid var(--cf-border)' }} />
+                    style={{
+                      flex: '1 1 calc(50% - 0.3rem)',
+                      maxWidth: 110,
+                      height: 90, objectFit: 'cover',
+                      borderRadius: 'var(--cf-radius-md)', cursor: 'zoom-in',
+                      border: '1px solid var(--cf-border)',
+                    }} />
                 ))}
               </div>
             </div>
@@ -277,6 +286,7 @@ export default function StaffIssueDetail() {
                 <button type="button" onClick={() => proofRef.current.click()}
                   style={{
                     display: 'flex', alignItems: 'center', gap: '0.5rem',
+                    width: '100%',
                     padding: '0.6rem 1.1rem', border: '1.5px dashed var(--cf-border)',
                     borderRadius: 'var(--cf-radius-md)', background: 'transparent',
                     color: 'var(--cf-text-secondary)', cursor: 'pointer', fontSize: '0.875rem',
@@ -333,10 +343,11 @@ export default function StaffIssueDetail() {
               </button>
             </form>
           </div>
-        </div>
+        </div>{/* /col-lg-8 */}
 
-        {/* ── Right sidebar ──────────────────────────────────────────── */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {/* ── Right column (sidebar) ─────────────────────────────────── */}
+        {/* d-flex flex-column gap-3 reproduces the old gap:'1rem' inner wrapper */}
+        <div className="col-12 col-lg-4 d-flex flex-column gap-3">
 
           {/* Status card */}
           <div className="cf-card" style={{ textAlign: 'center', padding: '1.25rem 1rem' }}>
@@ -369,8 +380,8 @@ export default function StaffIssueDetail() {
               </div>
             ))}
           </div>
-        </div>
-      </div>
+        </div>{/* /col-lg-4 */}
+      </div>{/* /row */}
     </StaffLayout>
   );
 }
