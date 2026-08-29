@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import NotificationBell from './NotificationBell';
 
 const NAV = [
   { to: '/dashboard',            icon: 'bi-house',          label: 'Overview' },
@@ -95,7 +96,7 @@ export default function DashboardLayout({ children, title }) {
             }}>
               {user?.name?.[0]?.toUpperCase() || 'U'}
             </div>
-            <div style={{ overflow: 'hidden' }}>
+            <div style={{ overflow: 'hidden', flex: 1 }}>
               <div style={{ color: '#fff', fontWeight: 600, fontSize: '0.8125rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {user?.name}
               </div>
@@ -103,6 +104,8 @@ export default function DashboardLayout({ children, title }) {
                 {user?.role}
               </div>
             </div>
+            {/* Notification bell — visible to all logged-in users */}
+            <NotificationBell />
           </div>
           <button
             onClick={handleLogout}

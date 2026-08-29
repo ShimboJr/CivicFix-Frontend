@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import NotificationBell from './NotificationBell';
 
 const NAV = [
   { to: '/staff',          icon: 'bi-house',          label: 'Overview',        end: true },
@@ -84,10 +85,12 @@ export default function StaffLayout({ children, title }) {
             }}>
               {user?.name?.[0]?.toUpperCase() || 'S'}
             </div>
-            <div style={{ overflow: 'hidden' }}>
+            <div style={{ overflow: 'hidden', flex: 1 }}>
               <div style={{ color: '#fff', fontWeight: 600, fontSize: '0.78rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.name}</div>
               <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.68rem' }}>Staff Member</div>
             </div>
+            {/* Notification bell */}
+            <NotificationBell />
           </div>
           <button onClick={handleLogout}
             style={{
