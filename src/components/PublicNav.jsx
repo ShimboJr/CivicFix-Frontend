@@ -33,18 +33,20 @@ export default function PublicNav() {
   // as soon as the user taps a link on mobile.
   const close = useCallback(() => setOpen(false), []);
 
-  // ── Shared nav-link style function ──────────────────────────────────────────
-  // Desktop: the active link gets a coloured bottom border (underline indicator).
-  // Mobile: border-bottom would be invisible in block flow, so we rely on colour
-  //         + font-weight alone to signal the active page.
+  // ── Nav-link style function ──────────────────────────────────────────────
+  // Active state: white text + bold + accent bottom-border (underline indicator).
+  // The border-bottom shows as a text-underline on mobile (acceptable) and as a
+  // tab-style underline indicator on the desktop horizontal bar (intended).
   const navLinkStyle = ({ isActive }) => ({
     color:          isActive ? '#fff' : 'rgba(255,255,255,0.82)',
     fontWeight:     isActive ? 600 : 500,
     fontSize:       '0.875rem',
     textDecoration: 'none',
     padding:        '0.4rem 0',
+    paddingBottom:  isActive ? 'calc(0.4rem - 2px)' : '0.4rem',  // compensate for border height
     display:        'block',
-    transition:     'color 150ms',
+    borderBottom:   isActive ? '2px solid var(--cf-accent)' : '2px solid transparent',
+    transition:     'color 150ms, border-color 150ms',
   });
 
   return (
@@ -119,7 +121,8 @@ export default function PublicNav() {
       <div className={`navbar-collapse collapse${open ? ' show' : ''}`}>
 
         {/* ── Centre nav links ───────────────────────────────────────────── */}
-        <ul className="navbar-nav mx-auto mb-3 mb-lg-0">
+        {/* gap-4 provides the horizontal space between items at lg+.         */}
+        <ul className="navbar-nav mx-auto mb-3 mb-lg-0 gap-lg-4">
 
           <li className="nav-item">
             <NavLink to="/" end onClick={close} className="nav-link" style={navLinkStyle}>
