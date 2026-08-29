@@ -93,7 +93,7 @@ export default function NotificationBell() {
     return () => document.removeEventListener('keydown', handleKey);
   }, [open]);
 
-  // ── Mark single as read then navigate ───────────────────────────────────
+  // ── Mark single as read then navigate ────────────────────────────────────
   const handleNotifClick = async (notif) => {
     setOpen(false);
     if (!notif.read) {
@@ -105,7 +105,14 @@ export default function NotificationBell() {
         setUnreadCount((c) => Math.max(0, c - 1));
       } catch { /* ignore */ }
     }
-    navigate(`/issue/${notif.issue?._id || notif.issue}`);
+    // Guard: if the referenced issue was deleted, issue may be null.
+    // Never navigate to /issue/null — go to /my-reports as a safe fallback.
+    const issueId = notif.issue?._id || notif.issue;
+    if (!issueId) {
+      navigate('/my-reports');
+      return;
+    }
+    navigate(`/issue/${issueId}`);
   };
 
   // ── Mark all as read ────────────────────────────────────────────────────
@@ -179,37 +186,76 @@ export default function NotificationBell() {
             No notifications yet
           </div>
         ) : (
-          notifications.map((notif) => (
-            <button
-              key={notif._id}
-              onClick={() => handleNotifClick(notif)}
-              style={{
-                display: 'block', width: '100%', textAlign: 'left',
-                padding: '0.65rem 0.9rem',
-                background: notif.read ? 'transparent' : 'var(--cf-primary-light)',
-                border: 'none', borderBottom: '1px solid var(--cf-border-light)',
-                cursor: 'pointer', transition: 'background 120ms',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--cf-bg)')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = notif.read ? 'transparent' : 'var(--cf-primary-light)')}
-            >
-              {!notif.read && (
-                <span style={{
-                  display: 'inline-block', width: 7, height: 7,
-                  borderRadius: '50%', background: 'var(--cf-primary)',
-                  marginRight: '0.5rem', verticalAlign: 'middle', flexShrink: 0,
-                }} />
-              )}
-              <span style={{ fontSize: '0.8125rem', color: 'var(--cf-text)', lineHeight: 1.45 }}>
-                {notif.message}
-              </span>
-              <div style={{ fontSize: '0.7rem', color: 'var(--cf-text-muted)', marginTop: '0.2rem' }}>
-                {new Date(notif.createdAt).toLocaleDateString('en-GB', {
-                  day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-                })}
-              </div>
-            </button>
-          ))
+          notifications.map((notif) => {
+            // Resolve the issue id (may be populated object or raw ObjectId string).
+            // If the issue was deleted before backend cleanup ran, this may be null.
+            const issueId = notif.issue?._id || notif.issue || null;
+            const isOrphaned = !issueId;
+
+            // Shared inner content for both the clickable and non-clickable variants
+            const inner = (
+              <>
+                {!notif.read && (
+                  <span style={{
+                    display: 'inline-block', width: 7, height: 7,
+                    borderRadius: '50%', background: 'var(--cf-primary)',
+                    marginRight: '0.5rem', verticalAlign: 'middle', flexShrink: 0,
+                  }} />
+                )}
+                <span style={{ fontSize: '0.8125rem', color: 'var(--cf-text)', lineHeight: 1.45 }}>
+                  {notif.message}
+                </span>
+                {isOrphaned && (
+                  <span style={{
+                    display: 'block',
+                    fontSize: '0.7rem',
+                    color: 'var(--cf-text-muted)',
+                    marginTop: '0.15rem',
+                    fontStyle: 'italic',
+                  }}>
+                    (issue no longer available)
+                  </span>
+                )}
+                <div style={{ fontSize: '0.7rem', color: 'var(--cf-text-muted)', marginTop: '0.2rem' }}>
+                  {new Date(notif.createdAt).toLocaleDateString('en-GB', {
+                    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+                  })}
+                </div>
+              </>
+            );
+
+            const rowStyle = {
+              display: 'block', width: '100%', textAlign: 'left',
+              padding: '0.65rem 0.9rem',
+              background: notif.read ? 'transparent' : 'var(--cf-primary-light)',
+              border: 'none', borderBottom: '1px solid var(--cf-border-light)',
+              transition: 'background 120ms',
+            };
+
+            if (isOrphaned) {
+              // Non-clickable row: the issue no longer exists
+              return (
+                <div
+                  key={notif._id}
+                  style={{ ...rowStyle, cursor: 'default' }}
+                >
+                  {inner}
+                </div>
+              );
+            }
+
+            return (
+              <button
+                key={notif._id}
+                onClick={() => handleNotifClick(notif)}
+                style={{ ...rowStyle, cursor: 'pointer' }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--cf-bg)')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = notif.read ? 'transparent' : 'var(--cf-primary-light)')}
+              >
+                {inner}
+              </button>
+            );
+          })
         )}
       </div>
 

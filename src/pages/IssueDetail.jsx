@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import StatusBadge from '../components/StatusBadge';
 import DashboardLayout from '../components/DashboardLayout';
+import PublicNav from '../components/PublicNav';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 
 const STATUS_ORDER = ['Pending', 'Under Review', 'Assigned', 'In Progress', 'Resolved'];
@@ -24,6 +25,29 @@ function formatDate(d) {
   });
 }
 
+// ── Layout wrapper ────────────────────────────────────────────────────────────
+// IMPORTANT: this must live at module scope, NOT inside IssueDetail.
+// Defining a component inside a render function gives it a new identity on
+// every render, so React unmounts + remounts the whole subtree on each
+// keystroke — causing the comment textarea to lose focus after every character.
+//
+// Authenticated users get DashboardLayout; guests get a plain public page
+// with PublicNav. The `user` value is passed as a prop so the component
+// doesn't need to call useAuth() itself.
+function PageWrapper({ user, children }) {
+  if (user) {
+    return <DashboardLayout>{children}</DashboardLayout>;
+  }
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--cf-bg)' }}>
+      <PublicNav />
+      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '2rem 1.5rem' }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export default function IssueDetail() {
   const { id }       = useParams();
   const { user }     = useAuth();
@@ -33,6 +57,7 @@ export default function IssueDetail() {
   const [comments,   setComments]   = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState('');
+  const [notFound,   setNotFound]   = useState(false); // true on 404 or stale id
   const [upvoting,   setUpvoting]   = useState(false);
   const [commentText, setCommentText] = useState('');
   const [posting,    setPosting]    = useState(false);
@@ -40,10 +65,27 @@ export default function IssueDetail() {
 
   // ── Load issue + comments ─────────────────────────────────────────────────
   useEffect(() => {
+    // Guard: if the id param is a literal string "null"/"undefined" (e.g. from
+    // a stale notification whose issue field was null on the frontend) skip the
+    // API call entirely and show the not-found state immediately.
+    if (!id || id === 'null' || id === 'undefined') {
+      setNotFound(true);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     api.get(`/issues/${id}`)
       .then(({ data }) => { setIssue(data.issue); setComments(data.comments); })
-      .catch((err) => setError(err.message))
+      .catch((err) => {
+        // Treat a 404 (deleted/never-existed issue) as a clean not-found state
+        // rather than exposing the raw error string.
+        if (err.response?.status === 404) {
+          setNotFound(true);
+        } else {
+          setError('Something went wrong loading this issue. Please try again.');
+        }
+      })
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -82,29 +124,77 @@ export default function IssueDetail() {
 
   const currentStatusIdx = STATUS_ORDER.indexOf(issue?.status);
 
+  // PageWrapper is defined at module scope (above) to avoid remounting the
+  // subtree on every render. Pass `user` so it can choose the right shell.
+
+  // ─────────────────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <DashboardLayout>
+      <PageWrapper user={user}>
         <div className="cf-spinner-wrap" style={{ minHeight: '60vh' }}>
           <div className="cf-spinner"></div>
         </div>
-      </DashboardLayout>
+      </PageWrapper>
     );
   }
 
-  if (error || !issue) {
+  // Friendly not-found screen: deleted issue, stale notification link, /issue/null, etc.
+  if (notFound || (!loading && !issue && !error)) {
     return (
-      <DashboardLayout>
+      <PageWrapper user={user}>
+        <div
+          style={{
+            maxWidth: 480, margin: '4rem auto', textAlign: 'center',
+            padding: '2.5rem', background: 'var(--cf-surface)',
+            borderRadius: 'var(--cf-radius-lg)', boxShadow: 'var(--cf-shadow-md)',
+            border: '1px solid var(--cf-border-light)',
+          }}
+        >
+          <i
+            className="bi bi-file-earmark-x"
+            style={{ fontSize: '2.75rem', color: 'var(--cf-text-muted)', display: 'block', marginBottom: '1rem' }}
+          />
+          <h1 style={{ fontSize: '1.15rem', marginBottom: '0.5rem' }}>Issue not found</h1>
+          <p style={{ color: 'var(--cf-text-secondary)', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: 1.6 }}>
+            This issue couldn&apos;t be found. It may have been removed or the link
+            is no longer valid.
+          </p>
+          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => navigate(-1)}
+              className="cf-btn cf-btn-outline"
+              style={{ fontSize: '0.875rem' }}
+            >
+              <i className="bi bi-arrow-left" /> Go back
+            </button>
+            {user ? (
+              <Link to="/dashboard" className="cf-btn cf-btn-primary" style={{ fontSize: '0.875rem' }}>
+                My dashboard
+              </Link>
+            ) : (
+              <Link to="/issues" className="cf-btn cf-btn-primary" style={{ fontSize: '0.875rem' }}>
+                Browse issues
+              </Link>
+            )}
+          </div>
+        </div>
+      </PageWrapper>
+    );
+  }
+
+  if (error) {
+    return (
+      <PageWrapper user={user}>
         <div className="cf-alert cf-alert-error" style={{ maxWidth: 500 }}>
           <i className="bi bi-exclamation-circle-fill"></i>
-          {error || 'Issue not found.'}
+          {error}
         </div>
-      </DashboardLayout>
+      </PageWrapper>
     );
   }
 
   return (
-    <DashboardLayout>
+    <PageWrapper user={user}>
 
       {/* Lightbox */}
       {lightbox && (
@@ -275,7 +365,7 @@ export default function IssueDetail() {
               </div>
             )}
 
-            {/* Add comment form */}
+            {/* Add comment form — gated: only logged-in users can post */}
             {user ? (
               <form onSubmit={handleComment} style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start' }}>
                 <div style={{
@@ -303,9 +393,22 @@ export default function IssueDetail() {
                 </div>
               </form>
             ) : (
-              <p style={{ fontSize: '0.875rem', color: 'var(--cf-text-muted)' }}>
-                <a href="/login">Sign in</a> to leave a comment.
-              </p>
+              /* Guest prompt — comment list above stays fully visible */
+              <div
+                style={{
+                  padding: '0.85rem 1rem',
+                  background: 'var(--cf-bg)',
+                  borderRadius: 'var(--cf-radius-md)',
+                  border: '1.5px dashed var(--cf-border)',
+                  fontSize: '0.875rem',
+                  color: 'var(--cf-text-secondary)',
+                  textAlign: 'center',
+                }}
+              >
+                <i className="bi bi-lock me-1" style={{ color: 'var(--cf-text-muted)' }} />
+                <Link to="/login" style={{ fontWeight: 600 }}>Log in</Link>
+                {' '}to add a comment.
+              </div>
             )}
           </div>
         </div>
@@ -313,27 +416,55 @@ export default function IssueDetail() {
         {/* ── Right sidebar ────────────────────────────────────────────── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
-          {/* Upvote card */}
+          {/* Upvote card — gated: logged-out users see a login prompt */}
           <div className="cf-card" style={{ textAlign: 'center', padding: '1.5rem 1rem' }}>
-            <button
-              onClick={handleUpvote}
-              disabled={upvoting}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                borderRadius: 'var(--cf-radius-md)',
-                border: `2px solid ${hasUpvoted ? 'var(--cf-primary)' : 'var(--cf-border)'}`,
-                background: hasUpvoted ? 'var(--cf-primary-light)' : 'transparent',
-                color: hasUpvoted ? 'var(--cf-primary)' : 'var(--cf-text-secondary)',
-                cursor: 'pointer',
-                fontWeight: 600, fontSize: '0.9rem',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-                transition: 'all 150ms',
-              }}
-            >
-              <i className={`bi ${hasUpvoted ? 'bi-hand-thumbs-up-fill' : 'bi-hand-thumbs-up'}`} style={{ fontSize: '1.1rem' }}></i>
-              {hasUpvoted ? 'You reported this too' : 'I also experience this'}
-            </button>
+            {user ? (
+              /* Authenticated: interactive upvote button */
+              <button
+                onClick={handleUpvote}
+                disabled={upvoting}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  borderRadius: 'var(--cf-radius-md)',
+                  border: `2px solid ${hasUpvoted ? 'var(--cf-primary)' : 'var(--cf-border)'}`,
+                  background: hasUpvoted ? 'var(--cf-primary-light)' : 'transparent',
+                  color: hasUpvoted ? 'var(--cf-primary)' : 'var(--cf-text-secondary)',
+                  cursor: 'pointer',
+                  fontWeight: 600, fontSize: '0.9rem',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                  transition: 'all 150ms',
+                }}
+              >
+                <i className={`bi ${hasUpvoted ? 'bi-hand-thumbs-up-fill' : 'bi-hand-thumbs-up'}`} style={{ fontSize: '1.1rem' }}></i>
+                {hasUpvoted ? 'You reported this too' : 'I also experience this'}
+              </button>
+            ) : (
+              /* Guest: disabled-looking button + login prompt */
+              <div>
+                <div
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    borderRadius: 'var(--cf-radius-md)',
+                    border: '2px solid var(--cf-border)',
+                    background: 'var(--cf-bg)',
+                    color: 'var(--cf-text-muted)',
+                    fontWeight: 600, fontSize: '0.9rem',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                    userSelect: 'none',
+                    cursor: 'default',
+                    opacity: 0.75,
+                  }}
+                >
+                  <i className="bi bi-hand-thumbs-up" style={{ fontSize: '1.1rem' }} />
+                  I also experience this
+                </div>
+                <p style={{ margin: '0.55rem 0 0', fontSize: '0.78rem', color: 'var(--cf-text-muted)', lineHeight: 1.4 }}>
+                  <Link to="/login" style={{ fontWeight: 600 }}>Log in</Link> to upvote this issue
+                </p>
+              </div>
+            )}
             <p style={{ margin: '0.6rem 0 0', fontSize: '0.8125rem', color: 'var(--cf-text-muted)' }}>
               <strong style={{ color: 'var(--cf-text)' }}>{issue.upvotes?.length || 0}</strong> {(issue.upvotes?.length || 0) === 1 ? 'person has' : 'people have'} reported this issue
             </p>
@@ -452,6 +583,6 @@ export default function IssueDetail() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </PageWrapper>
   );
 }

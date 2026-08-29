@@ -62,7 +62,11 @@ export default function Notifications() {
         setUnreadCount((c) => Math.max(0, c - 1));
       } catch { /* ignore */ }
     }
-    navigate(`/issue/${notif.issue?._id || notif.issue}`);
+    // Guard: if the referenced issue was deleted, issue may be null.
+    // Never navigate to /issue/null — stay on the notifications page.
+    const issueId = notif.issue?._id || notif.issue;
+    if (!issueId) return;
+    navigate(`/issue/${issueId}`);
   };
 
   // ── Mark all as read ────────────────────────────────────────────────────
@@ -155,27 +159,29 @@ export default function Notifications() {
               {onlyUnread ? 'No unread notifications' : 'No notifications yet'}
             </div>
           ) : (
-            notifications.map((notif, i) => (
-              <button
-                key={notif._id}
-                onClick={() => handleClick(notif)}
-                style={{
-                  display: 'flex', alignItems: 'flex-start', gap: '0.75rem',
-                  width: '100%', textAlign: 'left',
-                  padding: '0.9rem 1.1rem',
-                  background: notif.read ? 'transparent' : 'var(--cf-primary-light)',
-                  border: 'none',
-                  borderBottom: i < notifications.length - 1 ? '1px solid var(--cf-border-light)' : 'none',
-                  cursor: 'pointer', transition: 'background 120ms',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--cf-bg)')}
-                onMouseLeave={(e) => (e.currentTarget.style.background = notif.read ? 'transparent' : 'var(--cf-primary-light)')}
-              >
-                {/* Unread dot */}
+          notifications.map((notif, i) => {
+            // Resolve the issue id — may be a populated object, a raw ObjectId
+            // string, or null if the issue was deleted before server-side cleanup ran.
+            const issueId   = notif.issue?._id || notif.issue || null;
+            const isOrphaned = !issueId;
+
+            const sharedStyle = {
+              display: 'flex', alignItems: 'flex-start', gap: '0.75rem',
+              width: '100%', textAlign: 'left',
+              padding: '0.9rem 1.1rem',
+              background: notif.read ? 'transparent' : 'var(--cf-primary-light)',
+              border: 'none',
+              borderBottom: i < notifications.length - 1 ? '1px solid var(--cf-border-light)' : 'none',
+              transition: 'background 120ms',
+            };
+
+            const innerContent = (
+              <>
+                {/* Bell icon */}
                 <div style={{ paddingTop: 4, flexShrink: 0 }}>
                   {notif.read
-                    ? <i className="bi bi-bell" style={{ fontSize: '1rem', color: 'var(--cf-text-muted)' }} />
-                    : <i className="bi bi-bell-fill" style={{ fontSize: '1rem', color: 'var(--cf-primary)' }} />
+                    ? <i className="bi bi-bell"      style={{ fontSize: '1rem', color: 'var(--cf-text-muted)' }} />
+                    : <i className="bi bi-bell-fill" style={{ fontSize: '1rem', color: 'var(--cf-primary)'   }} />
                   }
                 </div>
 
@@ -189,7 +195,12 @@ export default function Notifications() {
                   }}>
                     {notif.message}
                   </p>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--cf-text-muted)' }}>
+                  {isOrphaned && (
+                    <span style={{ fontSize: '0.75rem', color: 'var(--cf-text-muted)', fontStyle: 'italic' }}>
+                      (issue no longer available)
+                    </span>
+                  )}
+                  <span style={{ fontSize: '0.75rem', color: 'var(--cf-text-muted)', display: 'block', marginTop: isOrphaned ? '0.15rem' : 0 }}>
                     {new Date(notif.createdAt).toLocaleDateString('en-GB', {
                       day: 'numeric', month: 'long', year: 'numeric',
                       hour: '2-digit', minute: '2-digit',
@@ -197,9 +208,33 @@ export default function Notifications() {
                   </span>
                 </div>
 
-                <i className="bi bi-chevron-right" style={{ color: 'var(--cf-text-muted)', fontSize: '0.75rem', paddingTop: 4, flexShrink: 0 }} />
+                {!isOrphaned && (
+                  <i className="bi bi-chevron-right" style={{ color: 'var(--cf-text-muted)', fontSize: '0.75rem', paddingTop: 4, flexShrink: 0 }} />
+                )}
+              </>
+            );
+
+            if (isOrphaned) {
+              // Non-clickable: issue was deleted, nothing useful to navigate to
+              return (
+                <div key={notif._id} style={{ ...sharedStyle, cursor: 'default' }}>
+                  {innerContent}
+                </div>
+              );
+            }
+
+            return (
+              <button
+                key={notif._id}
+                onClick={() => handleClick(notif)}
+                style={{ ...sharedStyle, cursor: 'pointer' }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--cf-bg)')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = notif.read ? 'transparent' : 'var(--cf-primary-light)')}
+              >
+                {innerContent}
               </button>
-            ))
+            );
+          })
           )}
         </div>
 

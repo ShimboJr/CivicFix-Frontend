@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import PublicNav from '../components/PublicNav';
 
 /**
  * Minimal landing page placeholder.
@@ -8,40 +9,7 @@ export default function Home() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--cf-bg)' }}>
 
-      {/* Slim top bar */}
-      <nav style={{
-        background:   'var(--cf-primary)',
-        padding:      '0.9rem 2rem',
-        display:      'flex',
-        alignItems:   'center',
-        justifyContent: 'space-between',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          <div style={{
-            width: 34, height: 34,
-            background: 'rgba(255,255,255,0.15)',
-            borderRadius: 8,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#fff', fontSize: '1rem',
-          }}>
-            <i className="bi bi-building-check"></i>
-          </div>
-          <span style={{ fontFamily: 'var(--cf-font-heading)', fontWeight: 700, fontSize: '1.2rem', color: '#fff' }}>
-            Civic<span style={{ color: 'var(--cf-accent)' }}>Fix</span>
-          </span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-          <Link to="/map"
-            style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.875rem', fontWeight: 500, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-            onMouseEnter={(e) => e.currentTarget.style.color = '#fff'}
-            onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.8)'}
-          >
-            <i className="bi bi-map" /> Community Map
-          </Link>
-          <Link to="/login"    className="cf-btn cf-btn-outline" style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.4)', padding: '0.45rem 1rem', fontSize: '0.875rem' }}>Sign in</Link>
-          <Link to="/register" className="cf-btn cf-btn-accent"  style={{ padding: '0.45rem 1rem', fontSize: '0.875rem' }}>Get started</Link>
-        </div>
-      </nav>
+      <PublicNav />
 
       {/* Hero */}
       <div style={{ maxWidth: 640, margin: '0 auto', textAlign: 'center', padding: '6rem 2rem 3rem' }}>
@@ -68,7 +36,7 @@ export default function Home() {
           <Link to="/register" className="cf-btn cf-btn-primary" style={{ padding: '0.75rem 1.75rem', fontSize: '1rem' }}>
             <i className="bi bi-plus-circle"></i> Report an Issue
           </Link>
-          <Link to="/login" className="cf-btn cf-btn-outline" style={{ padding: '0.75rem 1.75rem', fontSize: '1rem' }}>
+          <Link to="/issues" className="cf-btn cf-btn-outline" style={{ padding: '0.75rem 1.75rem', fontSize: '1rem' }}>
             Browse Issues <i className="bi bi-arrow-right"></i>
           </Link>
         </div>

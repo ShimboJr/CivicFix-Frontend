@@ -3,10 +3,11 @@ import { AuthProvider }  from './context/AuthContext';
 import ProtectedRoute    from './components/ProtectedRoute';
 
 // Public pages
-import Home         from './pages/Home';
-import Login        from './pages/Login';
-import Register     from './pages/Register';
-import CommunityMap from './pages/CommunityMap';
+import Home          from './pages/Home';
+import Login         from './pages/Login';
+import Register      from './pages/Register';
+import CommunityMap  from './pages/CommunityMap';
+import PublicIssues  from './pages/PublicIssues';
 
 // Resident pages
 import ResidentDashboard from './pages/ResidentDashboard';
@@ -38,16 +39,11 @@ export default function App() {
           <Route path="/login"    element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/map"      element={<CommunityMap />} />
+          <Route path="/issues"   element={<PublicIssues />} />
 
-          {/* ── Issue detail — residents + admins (shared view) ────────────── */}
-          <Route
-            path="/issue/:id"
-            element={
-              <ProtectedRoute>
-                <IssueDetail />
-              </ProtectedRoute>
-            }
-          />
+          {/* ── Issue detail — PUBLIC (API was already public; guests can view
+               full reports; only write-actions inside IssueDetail are gated) ── */}
+          <Route path="/issue/:id" element={<IssueDetail />} />
 
           {/* ── Notifications — any authenticated user ──────────────────────── */}
           <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
