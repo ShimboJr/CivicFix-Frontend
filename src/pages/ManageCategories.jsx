@@ -57,10 +57,10 @@ export default function ManageCategories() {
 
   return (
     <AdminLayout title="Manage Categories">
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '1.5rem', alignItems: 'start' }}>
+      <div className="row g-4 align-items-start">
 
         {/* ── Category list ─────────────────────────────────────────────── */}
-        <div>
+        <div className="col-12 col-lg">
           {error && (
             <div className="cf-alert cf-alert-error" style={{ marginBottom: '1rem' }}>
               <i className="bi bi-exclamation-circle-fill"></i> {error}
@@ -71,6 +71,7 @@ export default function ManageCategories() {
             <div className="cf-spinner-wrap" style={{ minHeight: '30vh' }}><div className="cf-spinner"></div></div>
           ) : (
             <div className="cf-card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div className="table-responsive">
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
@@ -114,11 +115,13 @@ export default function ManageCategories() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
         </div>
 
         {/* ── Add / Edit form ───────────────────────────────────────────── */}
+        <div className="col-12 col-lg-auto" style={{ minWidth: 0 }}>
         <div className="cf-card" style={{ position: 'sticky', top: '1.5rem' }}>
           <h3 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: '1.1rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--cf-border-light)' }}>
             <i className={`bi ${editId ? 'bi-pencil-square' : 'bi-plus-circle'} me-2`} style={{ color: 'var(--cf-primary)' }}></i>
@@ -172,6 +175,7 @@ export default function ManageCategories() {
               )}
             </div>
           </form>
+        </div>
         </div>
       </div>
     </AdminLayout>

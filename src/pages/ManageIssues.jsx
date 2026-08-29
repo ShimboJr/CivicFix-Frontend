@@ -91,33 +91,37 @@ export default function ManageIssues() {
     <AdminLayout title="Manage Issues">
 
       {/* ── Filters ──────────────────────────────────────────────────────── */}
+      {/* On mobile the bar wraps: search first (full width), then selects + Clear, then count */}
       <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '1.25rem', alignItems: 'center' }}>
-        <div style={{ position: 'relative', flex: '1 1 200px', maxWidth: 280 }}>
+        <div style={{ position: 'relative', flex: '1 1 100%', maxWidth: '100%' }}>
           <i className="bi bi-search" style={{ position: 'absolute', left: '0.7rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--cf-text-muted)', fontSize: '0.85rem' }}></i>
           <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             placeholder="Search issues…" className="cf-input" style={{ paddingLeft: '2.1rem', height: 36, fontSize: '0.85rem' }} />
         </div>
 
-        {[
-          { val: catFilter,    set: setCatFilter,    placeholder: 'All Categories', opts: categories.map((c) => ({ v: c._id, l: c.name })) },
-          { val: statusFilter, set: setStatusFilter, placeholder: 'All Statuses',   opts: STATUSES.map((s) => ({ v: s, l: s })) },
-          { val: sevFilter,    set: setSevFilter,    placeholder: 'All Severities', opts: SEVERITIES.map((s) => ({ v: s, l: s })) },
-        ].map(({ val, set, placeholder, opts }) => (
-          <select key={placeholder} value={val}
-            onChange={(e) => { set(e.target.value); setPage(1); }}
-            className="cf-input"
-            style={{ height: 36, fontSize: '0.85rem', width: 'auto', minWidth: 140, cursor: 'pointer' }}>
-            <option value="">{placeholder}</option>
-            {opts.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
-          </select>
-        ))}
+        {/* Selects + Clear on one flex row that itself wraps */}
+        <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center', flex: '1 1 auto' }}>
+          {[
+            { val: catFilter,    set: setCatFilter,    placeholder: 'All Categories', opts: categories.map((c) => ({ v: c._id, l: c.name })) },
+            { val: statusFilter, set: setStatusFilter, placeholder: 'All Statuses',   opts: STATUSES.map((s) => ({ v: s, l: s })) },
+            { val: sevFilter,    set: setSevFilter,    placeholder: 'All Severities', opts: SEVERITIES.map((s) => ({ v: s, l: s })) },
+          ].map(({ val, set, placeholder, opts }) => (
+            <select key={placeholder} value={val}
+              onChange={(e) => { set(e.target.value); setPage(1); }}
+              className="cf-input"
+              style={{ height: 36, fontSize: '0.85rem', flex: '1 1 120px', minWidth: 120, cursor: 'pointer' }}>
+              <option value="">{placeholder}</option>
+              {opts.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
+            </select>
+          ))}
 
-        <button onClick={() => { setSearch(''); setCatFilter(''); setStatusFilter(''); setSevFilter(''); setPage(1); }}
-          className="cf-btn cf-btn-outline" style={{ height: 36, fontSize: '0.8rem', padding: '0 0.85rem' }}>
-          <i className="bi bi-x-circle"></i> Clear
-        </button>
+          <button onClick={() => { setSearch(''); setCatFilter(''); setStatusFilter(''); setSevFilter(''); setPage(1); }}
+            className="cf-btn cf-btn-outline" style={{ height: 36, fontSize: '0.8rem', padding: '0 0.85rem', flexShrink: 0 }}>
+            <i className="bi bi-x-circle"></i> Clear
+          </button>
+        </div>
 
-        <span style={{ marginLeft: 'auto', fontSize: '0.78rem', color: 'var(--cf-text-muted)' }}>
+        <span style={{ fontSize: '0.78rem', color: 'var(--cf-text-muted)', whiteSpace: 'nowrap' }}>
           {total} issue{total !== 1 ? 's' : ''}
         </span>
       </div>

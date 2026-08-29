@@ -130,9 +130,11 @@ export default function Analytics() {
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+      {/* All chart panels in a responsive Bootstrap grid */}
+      <div className="row g-4">
 
-        {/* ── Issues by Category — Horizontal Bar ───────────────────────── */}
+        {/* ── Issues by Category ─────────────────────────────────────────── */}
+        <div className="col-12 col-xl-6">
         <div className="cf-card">
           <h2 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: '1.25rem' }}>
             <i className="bi bi-bar-chart-horizontal me-2" style={{ color: 'var(--cf-primary)' }} />
@@ -152,8 +154,10 @@ export default function Analytics() {
             </ResponsiveContainer>
           )}
         </div>
+        </div>
 
-        {/* ── Issues over Time — Line Chart (with window control) ─────────── */}
+        {/* ── Issues over Time ─────────────────────────────────────────────── */}
+        <div className="col-12 col-xl-6">
         <div className="cf-card">
           {/* Header row: title + 6/12/24 month toggle */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -210,9 +214,11 @@ export default function Analytics() {
             </ResponsiveContainer>
           )}
         </div>
+        </div>
 
-        {/* ── Most Problematic Areas ────────────────────────────────────── */}
-        <div className="cf-card" style={{ gridColumn: '1 / -1' }}>
+        {/* ── Most Problematic Areas ────────────────────────────────────────── */}
+        <div className="col-12">
+        <div className="cf-card">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <h2 style={{ fontSize: '0.95rem', fontWeight: 600, margin: 0 }}>
               <i className="bi bi-exclamation-triangle me-2" style={{ color: '#f59e0b' }} />
@@ -245,11 +251,19 @@ export default function Analytics() {
                   <Link
                     key={i}
                     to="/map"
-                    style={{ display: 'flex', alignItems: 'center', gap: '1rem', textDecoration: 'none', color: 'inherit', padding: '0.4rem 0.25rem', borderRadius: 6, transition: 'background 120ms' }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '0.6rem',
+                      textDecoration: 'none', color: 'inherit',
+                      padding: '0.4rem 0.25rem', borderRadius: 6,
+                      transition: 'background 120ms',
+                    }}
                     onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--cf-bg)')}
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
-                    {/* Rank badge */}
+                    {/* Rank badge — always stays on the first line */}
                     <span style={{
                       width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
                       background: i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : i === 2 ? '#b45309' : 'var(--cf-border)',
@@ -260,17 +274,46 @@ export default function Analytics() {
                       {i + 1}
                     </span>
 
-                    {/* Address */}
+                    {/*
+                      Address — flex:1 1 0% + minWidth:0 means it claims ALL the
+                      remaining width on the first line instead of being crushed by
+                      its fixed-width siblings.
+
+                      overflowWrap:break-word (NOT 'anywhere' / 'break-all') only
+                      triggers for a single unbreakable token (e.g. a URL with no
+                      spaces).  Normal space-separated address text already wraps at
+                      word boundaries without any special rule — using 'anywhere'
+                      is what caused the one-character-per-line rendering when the
+                      span was squeezed to near-zero width.
+                    */}
                     <span style={{
-                      flex: 1, fontSize: '0.85rem', fontWeight: 500,
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      flex: '1 1 0%',
+                      minWidth: 0,
+                      fontSize: '0.85rem', fontWeight: 500,
+                      overflowWrap: 'break-word',
                       color: 'var(--cf-text)',
                     }}>
                       {area.address || `${area.lat}, ${area.lng}`}
                     </span>
 
-                    {/* Mini bar */}
-                    <div style={{ width: 140, background: 'var(--cf-border-light)', borderRadius: 999, height: 8, flexShrink: 0 }}>
+                    {/* Count badge — stays beside the address on line 1 */}
+                    <span style={{
+                      flexShrink: 0,
+                      fontSize: '0.82rem', fontWeight: 700,
+                      color: 'var(--cf-primary)',
+                    }}>
+                      {area.count}
+                    </span>
+
+                    {/*
+                      Mini bar — on desktop (wide) it sits on line 1;
+                      on mobile flexWrap lets it drop to line 2 where it
+                      has room to render at a readable width.
+                    */}
+                    <div style={{
+                      flex: '1 1 80px', maxWidth: 140,
+                      background: 'var(--cf-border-light)', borderRadius: 999, height: 8,
+                    }}>
                       <div style={{
                         width: `${pct}%`, height: '100%', borderRadius: 999,
                         background: i === 0 ? '#f59e0b' : 'var(--cf-primary)',
@@ -278,17 +321,11 @@ export default function Analytics() {
                       }} />
                     </div>
 
-                    {/* Count badge */}
+                    {/* Coordinates sub-label — decorative, wraps with the mini bar */}
                     <span style={{
-                      minWidth: 28, textAlign: 'right', flexShrink: 0,
-                      fontSize: '0.82rem', fontWeight: 700,
-                      color: 'var(--cf-primary)',
+                      fontSize: '0.68rem', color: 'var(--cf-text-muted)',
+                      flexShrink: 0, fontFamily: 'monospace',
                     }}>
-                      {area.count}
-                    </span>
-
-                    {/* Coordinates sub-label */}
-                    <span style={{ fontSize: '0.68rem', color: 'var(--cf-text-muted)', flexShrink: 0, fontFamily: 'monospace' }}>
                       {area.lat}, {area.lng}
                     </span>
                   </Link>
@@ -297,9 +334,11 @@ export default function Analytics() {
             </div>
           )}
         </div>
+        </div>
 
-        {/* ── Average Resolution Time ───────────────────────────────────── */}
-        <div className="cf-card" style={{ gridColumn: '1 / -1' }}>
+        {/* ── Average Resolution Time ────────────────────────────────────────── */}
+        <div className="col-12">
+        <div className="cf-card">
           <h2 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: '1rem' }}>
             <i className="bi bi-clock-history me-2" style={{ color: '#8b5cf6' }} />
             Average Resolution Time
@@ -310,7 +349,8 @@ export default function Analytics() {
               No resolved issues yet — this stat will appear once at least one issue reaches "Resolved" status.
             </p>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '1.5rem', alignItems: 'start' }}>
+            // Stack vertically on mobile, side-by-side at md+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', alignItems: 'start' }}>
 
               {/* Headline figure */}
               <div style={{
@@ -364,10 +404,12 @@ export default function Analytics() {
             </div>
           )}
         </div>
+        </div>
 
-        {/* ── Top Locations (legacy address-based — kept for reference) ──── */}
+        {/* ── Top Locations ───────────────────────────────────────────────── */}
         {data?.topLocations?.length > 0 && (
-          <div className="cf-card" style={{ gridColumn: '1 / -1' }}>
+          <div className="col-12">
+          <div className="cf-card">
             <h2 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: '1rem' }}>
               <i className="bi bi-geo-alt me-2" style={{ color: 'var(--cf-primary)' }} />
               Top 5 Locations by Address
@@ -382,7 +424,8 @@ export default function Analytics() {
                 return (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <span style={{ width: 18, color: 'var(--cf-text-muted)', fontSize: '0.78rem', textAlign: 'right', flexShrink: 0 }}>#{i + 1}</span>
-                    <span style={{ flex: 1, fontSize: '0.85rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{loc.location}</span>
+                    <span style={{ flex: 1, fontSize: '0.85rem', fontWeight: 500,
+                      wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{loc.location}</span>
                     <div style={{ width: 160, background: 'var(--cf-border-light)', borderRadius: 999, height: 8, flexShrink: 0 }}>
                       <div style={{ width: `${pct}%`, height: '100%', background: 'var(--cf-primary)', borderRadius: 999, transition: 'width 600ms ease' }} />
                     </div>
@@ -391,6 +434,7 @@ export default function Analytics() {
                 );
               })}
             </div>
+          </div>
           </div>
         )}
 

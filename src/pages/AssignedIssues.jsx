@@ -52,14 +52,14 @@ export default function AssignedIssues() {
 
       {/* ── Controls ──────────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '1.25rem', alignItems: 'center' }}>
-        <div style={{ position: 'relative', flex: '1 1 200px', maxWidth: 280 }}>
+        <div style={{ position: 'relative', flex: '1 1 100%', maxWidth: '100%' }}>
           <i className="bi bi-search" style={{ position: 'absolute', left: '0.7rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--cf-text-muted)', fontSize: '0.85rem' }}></i>
           <input value={search} onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by title, location, ID…" className="cf-input"
             style={{ paddingLeft: '2.1rem', height: 36, fontSize: '0.85rem' }} />
         </div>
 
-        <div style={{ display: 'flex', gap: '0.35rem' }}>
+        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
           <button onClick={() => setStatusFilter('')}
             className={`cf-btn ${!statusFilter ? 'cf-btn-primary' : 'cf-btn-outline'}`}
             style={{ height: 36, fontSize: '0.8rem', padding: '0 0.85rem' }}>
@@ -79,7 +79,7 @@ export default function AssignedIssues() {
           ))}
         </div>
 
-        <span style={{ marginLeft: 'auto', fontSize: '0.78rem', color: 'var(--cf-text-muted)' }}>
+        <span style={{ fontSize: '0.78rem', color: 'var(--cf-text-muted)', whiteSpace: 'nowrap' }}>
           {filtered.length} issue{filtered.length !== 1 ? 's' : ''}
         </span>
       </div>
