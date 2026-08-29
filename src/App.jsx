@@ -3,9 +3,10 @@ import { AuthProvider }  from './context/AuthContext';
 import ProtectedRoute    from './components/ProtectedRoute';
 
 // Public pages
-import Home     from './pages/Home';
-import Login    from './pages/Login';
-import Register from './pages/Register';
+import Home         from './pages/Home';
+import Login        from './pages/Login';
+import Register     from './pages/Register';
+import CommunityMap from './pages/CommunityMap';
 
 // Resident pages
 import ResidentDashboard from './pages/ResidentDashboard';
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="/"         element={<Home />} />
           <Route path="/login"    element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/map"      element={<CommunityMap />} />
 
           {/* ── Issue detail — residents + admins (shared view) ────────────── */}
           <Route

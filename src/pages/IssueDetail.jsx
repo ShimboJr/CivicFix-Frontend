@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import StatusBadge from '../components/StatusBadge';
 import DashboardLayout from '../components/DashboardLayout';
+import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 
 const STATUS_ORDER = ['Pending', 'Under Review', 'Assigned', 'In Progress', 'Resolved'];
 
@@ -337,6 +338,46 @@ export default function IssueDetail() {
               <strong style={{ color: 'var(--cf-text)' }}>{issue.upvotes?.length || 0}</strong> {(issue.upvotes?.length || 0) === 1 ? 'person has' : 'people have'} reported this issue
             </p>
           </div>
+
+          {/* Location mini-map — only shown when coordinates are stored */}
+          {issue.location?.latitude && issue.location?.longitude && (
+            <div className="cf-card" style={{ padding: '1rem' }}>
+              <h3 style={{
+                fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.6rem',
+                color: 'var(--cf-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em',
+              }}>
+                <i className="bi bi-geo-alt me-1" style={{ color: 'var(--cf-primary)' }} />
+                Location
+              </h3>
+              <div style={{
+                height: 180, borderRadius: 'var(--cf-radius-md)',
+                overflow: 'hidden', border: '1px solid var(--cf-border)',
+              }}>
+                {/* Non-interactive: scrollWheelZoom and dragging are disabled. */}
+                <MapContainer
+                  center={[issue.location.latitude, issue.location.longitude]}
+                  zoom={15}
+                  scrollWheelZoom={false}
+                  dragging={false}
+                  doubleClickZoom={false}
+                  zoomControl={false}
+                  attributionControl={false}
+                  style={{ height: '100%', width: '100%', pointerEvents: 'none' }}
+                >
+                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                  <Marker position={[issue.location.latitude, issue.location.longitude]} />
+                </MapContainer>
+              </div>
+              {issue.location.address && (
+                <p style={{
+                  fontSize: '0.75rem', color: 'var(--cf-text-muted)',
+                  marginTop: '0.4rem', marginBottom: 0, lineHeight: 1.4,
+                }}>
+                  {issue.location.address}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Status timeline */}
           <div className="cf-card">

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import DashboardLayout from '../components/DashboardLayout';
+import DashboardLayout   from '../components/DashboardLayout';
+import LocationPicker    from '../components/LocationPicker';
 
 const SEVERITY_HINTS = {
   Low:      'Minor inconvenience — e.g. a broken park bench or faded road markings.',
@@ -17,7 +18,8 @@ export default function ReportIssue() {
 
   const [categories, setCategories] = useState([]);
   const [form, setForm]             = useState({
-    title: '', description: '', category: '', severity: 'Medium', address: '',
+    title: '', description: '', category: '', severity: 'Medium',
+    address: '', latitude: null, longitude: null,
   });
   const [errors,    setErrors]    = useState({});
   const [images,    setImages]    = useState([]);     // File objects
@@ -73,7 +75,8 @@ export default function ReportIssue() {
     if (!form.title.trim())       errs.title       = 'Title is required';
     if (!form.description.trim()) errs.description = 'Description is required';
     if (!form.category)           errs.category    = 'Please select a category';
-    if (!form.address.trim())     errs.address     = 'Location address is required';
+    // Accept any non-empty address — coordinate-only strings are valid
+    if (!form.address)            errs.address     = 'Please pick a location on the map or type an address';
     return errs;
   };
 
@@ -88,7 +91,11 @@ export default function ReportIssue() {
     fd.append('description', form.description.trim());
     fd.append('category',    form.category);
     fd.append('severity',    form.severity);
-    fd.append('location',    JSON.stringify({ address: form.address.trim() }));
+    fd.append('location',    JSON.stringify({
+      address:   form.address,
+      latitude:  form.latitude,
+      longitude: form.longitude,
+    }));
     images.forEach((img) => fd.append('images', img));
 
     setSubmitting(true);
@@ -137,7 +144,7 @@ export default function ReportIssue() {
             </button>
             <button
               className="cf-btn cf-btn-outline"
-              onClick={() => { setSuccess(null); setForm({ title: '', description: '', category: '', severity: 'Medium', address: '' }); setImages([]); setPreviews([]); }}
+              onClick={() => { setSuccess(null); setForm({ title: '', description: '', category: '', severity: 'Medium', address: '', latitude: null, longitude: null }); setImages([]); setPreviews([]); }}
             >
               <i className="bi bi-plus-circle"></i> Report Another
             </button>
@@ -215,19 +222,21 @@ export default function ReportIssue() {
               </div>
             </div>
 
-            {/* Location */}
+            {/* Location — interactive map picker */}
             <div>
-              <label className="cf-form-label">Location Address</label>
-              <div style={{ position: 'relative' }}>
-                <i className="bi bi-geo-alt" style={{
-                  position: 'absolute', left: '0.75rem', top: '50%',
-                  transform: 'translateY(-50%)', color: 'var(--cf-text-muted)',
-                }}></i>
-                <input name="address" value={form.address} onChange={handleChange}
-                  className={`cf-input ${errors.address ? 'is-invalid' : ''}`}
-                  style={{ paddingLeft: '2.25rem' }}
-                  placeholder="e.g. 14 Broad Street, Lagos Island" />
-              </div>
+              <label className="cf-form-label">Location</label>
+              <LocationPicker
+                value={{
+                  address:   form.address,
+                  latitude:  form.latitude,
+                  longitude: form.longitude,
+                }}
+                onChange={({ address, latitude, longitude }) => {
+                  setForm((p) => ({ ...p, address, latitude, longitude }));
+                  if (errors.address) setErrors((p) => ({ ...p, address: '' }));
+                  setApiError('');
+                }}
+              />
               {errors.address && <p className="cf-field-error">{errors.address}</p>}
             </div>
           </div>

@@ -5,8 +5,15 @@ import { createRoot } from 'react-dom/client';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 
+// ── Leaflet CSS (must come before local styles) ───────────────────────────────
+import 'leaflet/dist/leaflet.css';
+
+// ── Leaflet default-icon fix for Vite bundler ─────────────────────────────────
+import './utils/leafletIconFix.js';
+
 // ── CivicFix global design system (overrides & custom tokens) ────────────────
 import './index.css';
+
 
 import App from './App.jsx';
 

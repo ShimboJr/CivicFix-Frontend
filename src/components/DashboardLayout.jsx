@@ -5,6 +5,7 @@ const NAV = [
   { to: '/dashboard',            icon: 'bi-house',          label: 'Overview' },
   { to: '/dashboard/report',     icon: 'bi-plus-circle',    label: 'Report Issue' },
   { to: '/dashboard/my-reports', icon: 'bi-card-list',      label: 'My Reports' },
+  { to: '/map',                  icon: 'bi-map',            label: 'Community Map' },
 ];
 
 export default function DashboardLayout({ children, title }) {

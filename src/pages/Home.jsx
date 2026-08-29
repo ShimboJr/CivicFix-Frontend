@@ -30,7 +30,14 @@ export default function Home() {
             Civic<span style={{ color: 'var(--cf-accent)' }}>Fix</span>
           </span>
         </div>
-        <div style={{ display: 'flex', gap: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+          <Link to="/map"
+            style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.875rem', fontWeight: 500, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+            onMouseEnter={(e) => e.currentTarget.style.color = '#fff'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.8)'}
+          >
+            <i className="bi bi-map" /> Community Map
+          </Link>
           <Link to="/login"    className="cf-btn cf-btn-outline" style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.4)', padding: '0.45rem 1rem', fontSize: '0.875rem' }}>Sign in</Link>
           <Link to="/register" className="cf-btn cf-btn-accent"  style={{ padding: '0.45rem 1rem', fontSize: '0.875rem' }}>Get started</Link>
         </div>
