@@ -221,10 +221,13 @@ export default function IssueDetail() {
         <i className="bi bi-arrow-left"></i> Back
       </button>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '1.5rem', alignItems: 'start' }}>
+      {/* ── Two-column layout ─────────────────────────────────────────────────
+           Below lg (<992 px): cols stack — right sidebar goes below the main content.
+           At lg+:             side-by-side at 8/4 col ratio, same as the old 1fr 300px. */}
+      <div className="row g-4 align-items-start">
 
-        {/* ── Left column ───────────────────────────────────────────────── */}
-        <div>
+        {/* ── Left column (main content) ────────────────────────────────── */}
+        <div className="col-12 col-lg-8">
           {/* Header card */}
           <div className="cf-card" style={{ marginBottom: '1rem' }}>
             <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.75rem', alignItems: 'center' }}>
@@ -278,7 +281,11 @@ export default function IssueDetail() {
                     alt={`Issue photo ${i + 1}`}
                     onClick={() => setLightbox(resolveImg(src))}
                     style={{
-                      width: 110, height: 90, objectFit: 'cover',
+                      /* On mobile: 2 thumbnails per row filling full width.
+                         On wider screens: fixed ~110 px as before.          */
+                      flex: '1 1 calc(50% - 0.3rem)',
+                      maxWidth: 110,
+                      height: 90, objectFit: 'cover',
                       borderRadius: 'var(--cf-radius-md)', cursor: 'zoom-in',
                       border: '1px solid var(--cf-border)',
                       transition: 'opacity 150ms',
@@ -411,10 +418,11 @@ export default function IssueDetail() {
               </div>
             )}
           </div>
-        </div>
+        </div>{/* /col-lg-8 */}
 
-        {/* ── Right sidebar ────────────────────────────────────────────── */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {/* ── Right column (sidebar) ─────────────────────────────────── */}
+        {/* d-flex flex-column gap-3 reproduces the old `gap:'1rem'` wrapper */}
+        <div className="col-12 col-lg-4 d-flex flex-column gap-3">
 
           {/* Upvote card — gated: logged-out users see a login prompt */}
           <div className="cf-card" style={{ textAlign: 'center', padding: '1.5rem 1rem' }}>
@@ -581,8 +589,8 @@ export default function IssueDetail() {
               </div>
             ))}
           </div>
-        </div>
-      </div>
+        </div>{/* /col-lg-4 */}
+      </div>{/* /row */}
     </PageWrapper>
   );
 }
