@@ -1,0 +1,50 @@
+# .github/workflows/ci.yml  (CivicFix-Frontend)
+#
+# Runs oxlint and a Vite production build on every push and pull_request to main.
+#
+# NOTE — monorepo context:
+#   The backend lives in a separate repository (CivicFix-Backend) and has its
+#   own CI workflow there.  This workflow covers the frontend only.
+
+name: Frontend CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  frontend:
+    name: Lint + Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'          # LTS — matches the project's target runtime
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        # Runs oxlint via the "lint" script in package.json
+        # (configured in .oxlintrc.json — enforces React hooks rules)
+        run: npm run lint
+
+      - name: Build
+        # A successful Vite build confirms no import errors, missing modules,
+        # or JSX transform failures — a reasonable CI stand-in until a frontend
+        # test suite is added.
+        env:
+          # Vite bakes VITE_* vars into the bundle at build time.
+          # The API URL must exist so the build doesn't fail on undefined imports,
+          # but the value doesn't need to be a real server for a build-only check.
+          VITE_API_URL: https://placeholder-for-ci-build-only.example.com/api
+        run: npm run build
