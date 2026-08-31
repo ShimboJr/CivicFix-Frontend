@@ -23,6 +23,7 @@ export default function PublicIssues() {
   const [page,      setPage]      = useState(1);
   const [pages,     setPages]     = useState(1);
   const [loading,   setLoading]   = useState(true);
+  const [error,     setError]     = useState(null);   // null = ok, string = failed
   const [categories, setCategories] = useState([]);
 
   // Filters
@@ -37,6 +38,7 @@ export default function PublicIssues() {
 
   const fetchIssues = useCallback(() => {
     setLoading(true);
+    setError(null);  // clear any previous error before each attempt
     const params = new URLSearchParams({
       page,
       limit: PAGE_SIZE,
@@ -51,7 +53,14 @@ export default function PublicIssues() {
         setTotal(data.total);
         setPages(data.pages);
       })
-      .catch(() => {})
+      .catch((err) => {
+        // Surface the failure so it renders as a visible error, not as
+        // an empty result — "0 issues found" and "server is down" must
+        // look different to anyone using or debugging the app.
+        setError(err?.response?.data?.message || err?.message || 'Failed to load issues');
+        setIssues([]);
+        setTotal(0);
+      })
       .finally(() => setLoading(false));
   }, [page, search, catFilter, statusFilter]);
 
@@ -199,11 +208,11 @@ export default function PublicIssues() {
             style={{
               marginLeft: 'auto',
               fontSize: '0.8125rem',
-              color: 'var(--cf-text-muted)',
+              color: error ? 'var(--cf-status-rejected)' : 'var(--cf-text-muted)',
               whiteSpace: 'nowrap',
             }}
           >
-            {loading ? '…' : `${total} issue${total !== 1 ? 's' : ''}`}
+            {loading ? '…' : error ? 'Error loading issues' : `${total} issue${total !== 1 ? 's' : ''}`}
           </span>
         </div>
 
@@ -216,6 +225,31 @@ export default function PublicIssues() {
             }}
           >
             <div className="cf-spinner" />
+          </div>
+        ) : error ? (
+          // ── Error state — visually distinct from "no results" ─────────────────
+          <div
+            style={{
+              textAlign: 'center', padding: '5rem 1rem',
+            }}
+          >
+            <i
+              className="bi bi-exclamation-triangle"
+              style={{ fontSize: '3rem', display: 'block', marginBottom: '1rem', color: 'var(--cf-status-rejected)' }}
+            />
+            <p style={{ fontSize: '1.05rem', fontWeight: 600, color: 'var(--cf-status-rejected)', marginBottom: '0.4rem' }}>
+              Couldn't load issues
+            </p>
+            <p style={{ fontSize: '0.875rem', color: 'var(--cf-text-muted)', marginBottom: '1rem', maxWidth: 380, margin: '0 auto 1rem' }}>
+              {error}
+            </p>
+            <button
+              onClick={fetchIssues}
+              className="cf-btn cf-btn-outline"
+              style={{ marginTop: '0.75rem' }}
+            >
+              <i className="bi bi-arrow-clockwise" /> Try again
+            </button>
           </div>
         ) : issues.length === 0 ? (
           <div
