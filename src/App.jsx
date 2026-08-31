@@ -20,11 +20,12 @@ import IssueDetail       from './pages/IssueDetail';
 import Notifications     from './pages/Notifications';
 
 // Admin pages
-import AdminDashboard    from './pages/AdminDashboard';
-import ManageIssues      from './pages/ManageIssues';
-import ManageUsers       from './pages/ManageUsers';
-import ManageCategories  from './pages/ManageCategories';
-import Analytics         from './pages/Analytics';
+import AdminDashboard          from './pages/AdminDashboard';
+import ManageIssues            from './pages/ManageIssues';
+import ManageUsers             from './pages/ManageUsers';
+import ManageCategories        from './pages/ManageCategories';
+import Analytics               from './pages/Analytics';
+import AdminEmergencyReports   from './pages/AdminEmergencyReports';
 
 // Staff pages
 import StaffDashboard    from './pages/StaffDashboard';
@@ -60,11 +61,12 @@ export default function App() {
           <Route path="/dashboard/report-emergency" element={<ProtectedRoute allowedRoles={['resident']}><ReportEmergency /></ProtectedRoute>} />
 
           {/* ── Admin zone ─────────────────────────────────────────────────── */}
-          <Route path="/admin"              element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>} />
-          <Route path="/admin/issues"       element={<ProtectedRoute allowedRoles={['admin']}><ManageIssues /></ProtectedRoute>} />
-          <Route path="/admin/users"        element={<ProtectedRoute allowedRoles={['admin']}><ManageUsers /></ProtectedRoute>} />
-          <Route path="/admin/categories"   element={<ProtectedRoute allowedRoles={['admin']}><ManageCategories /></ProtectedRoute>} />
-          <Route path="/admin/analytics"    element={<ProtectedRoute allowedRoles={['admin']}><Analytics /></ProtectedRoute>} />
+          <Route path="/admin"                     element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>} />
+          <Route path="/admin/issues"              element={<ProtectedRoute allowedRoles={['admin']}><ManageIssues /></ProtectedRoute>} />
+          <Route path="/admin/users"               element={<ProtectedRoute allowedRoles={['admin']}><ManageUsers /></ProtectedRoute>} />
+          <Route path="/admin/categories"          element={<ProtectedRoute allowedRoles={['admin']}><ManageCategories /></ProtectedRoute>} />
+          <Route path="/admin/analytics"           element={<ProtectedRoute allowedRoles={['admin']}><Analytics /></ProtectedRoute>} />
+          <Route path="/admin/emergency-reports"   element={<ProtectedRoute allowedRoles={['admin']}><AdminEmergencyReports /></ProtectedRoute>} />
 
           {/* ── Staff zone ─────────────────────────────────────────────────── */}
           <Route path="/staff"              element={<ProtectedRoute allowedRoles={['staff']}><StaffDashboard /></ProtectedRoute>} />

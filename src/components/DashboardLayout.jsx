@@ -48,11 +48,13 @@ const ROLE_CONFIG = {
     sectionLabel: 'Management',
     avatarBg:     'var(--cf-accent)',
     nav: [
-      { to: '/admin',            icon: 'bi-speedometer2',   label: 'Dashboard',  end: true },
-      { to: '/admin/issues',     icon: 'bi-card-checklist', label: 'Issues' },
-      { to: '/admin/users',      icon: 'bi-people',         label: 'Users' },
-      { to: '/admin/categories', icon: 'bi-tags',           label: 'Categories' },
-      { to: '/admin/analytics',  icon: 'bi-bar-chart-line', label: 'Analytics' },
+      { to: '/admin',                    icon: 'bi-speedometer2',              label: 'Dashboard',        end: true },
+      { to: '/admin/issues',             icon: 'bi-card-checklist',            label: 'Issues' },
+      { to: '/admin/users',              icon: 'bi-people',                    label: 'Users' },
+      { to: '/admin/categories',         icon: 'bi-tags',                      label: 'Categories' },
+      { to: '/admin/analytics',          icon: 'bi-bar-chart-line',            label: 'Analytics' },
+      // Emergency reports — urgent accent, kept visually distinct from routine items
+      { to: '/admin/emergency-reports',  icon: 'bi-exclamation-triangle-fill', label: 'Emergency Reports', emergency: true },
     ],
   },
   staff: {
