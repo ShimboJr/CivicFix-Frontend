@@ -31,6 +31,7 @@ export default function StaffIssueDetail() {
 
   const [issue,      setIssue]      = useState(null);
   const [comments,   setComments]   = useState([]);
+  const [auditLog,   setAuditLog]   = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState('');
   const [lightbox,   setLightbox]   = useState(null);
@@ -62,6 +63,14 @@ export default function StaffIssueDetail() {
 
   useEffect(() => { load(); }, [id]);
 
+  // ── Load audit log (separate, non-blocking) ─────────────────────────────────
+  const loadAuditLog = () =>
+    api.get(`/issues/${id}/audit-log`)
+      .then(({ data }) => setAuditLog(data))
+      .catch(() => {});
+
+  useEffect(() => { loadAuditLog(); }, [id]);
+
   // ── Advance status ────────────────────────────────────────────────────────
   const handleProgress = async () => {
     setProgressing(true); setProgError(''); setProgSuccess('');
@@ -71,7 +80,9 @@ export default function StaffIssueDetail() {
       setProgSuccess(`Status advanced to "${data.status}"`);
       setNote('');
       // Reload comments so the progress note appears in thread
-      api.get(`/issues/${id}/comments`).then(({ data }) => setComments(data)).catch(() => {});
+      api.get(`/issues/${id}/comments`).then(({ data: c }) => setComments(c)).catch(() => {});
+      // Reload audit log so the new entry appears immediately
+      loadAuditLog();
     } catch (err) { setProgError(err.message); }
     finally { setProgressing(false); }
   };
@@ -380,6 +391,66 @@ export default function StaffIssueDetail() {
               </div>
             ))}
           </div>
+
+          {/* Change History (audit log) */}
+          {auditLog.length > 0 && (
+            <div className="cf-card">
+              <h3 style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.85rem', color: 'var(--cf-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <i className="bi bi-clock-history me-1" style={{ color: 'var(--cf-primary)' }} />
+                Change History
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                {auditLog.map((entry) => (
+                  <div key={entry._id} style={{
+                    padding: '0.6rem 0.75rem',
+                    background: 'var(--cf-bg)',
+                    borderRadius: 'var(--cf-radius-md)',
+                    border: '1px solid var(--cf-border-light)',
+                    fontSize: '0.8rem',
+                  }}>
+                    {/* who + when */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem', flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--cf-text)' }}>
+                        {entry.changedBy?.name || 'Unknown'}
+                      </span>
+                      {entry.changedBy?.role && entry.changedBy.role !== 'resident' && (
+                        <span style={{
+                          fontSize: '0.68rem', fontWeight: 600,
+                          background: entry.changedBy.role === 'staff' ? '#d1fae5' : 'var(--cf-primary-light)',
+                          color:      entry.changedBy.role === 'staff' ? '#065f46' : 'var(--cf-primary)',
+                          padding: '0.1rem 0.4rem', borderRadius: 999,
+                        }}>
+                          {entry.changedBy.role}
+                        </span>
+                      )}
+                      <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: 'var(--cf-text-muted)', whiteSpace: 'nowrap' }}>
+                        {formatDate(entry.createdAt)}
+                      </span>
+                    </div>
+                    {/* transition */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <span style={{ background: 'var(--cf-border-light)', padding: '0.1rem 0.45rem', borderRadius: 4, fontSize: '0.75rem' }}>
+                        {entry.fromStatus}
+                      </span>
+                      <i className="bi bi-arrow-right" style={{ fontSize: '0.7rem', color: 'var(--cf-text-muted)' }} />
+                      <span style={{
+                        background: entry.toStatus === 'Rejected' ? '#fee2e2' : entry.toStatus === 'Resolved' ? '#d1fae5' : 'var(--cf-primary-light)',
+                        color:      entry.toStatus === 'Rejected' ? '#b91c1c' : entry.toStatus === 'Resolved' ? '#065f46' : 'var(--cf-primary)',
+                        padding: '0.1rem 0.45rem', borderRadius: 4, fontSize: '0.75rem', fontWeight: 600,
+                      }}>
+                        {entry.toStatus}
+                      </span>
+                    </div>
+                    {entry.reason && (
+                      <p style={{ margin: '0.35rem 0 0', fontSize: '0.75rem', color: 'var(--cf-text-secondary)', fontStyle: 'italic' }}>
+                        “{entry.reason}”
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>{/* /col-lg-4 */}
       </div>{/* /row */}
     </StaffLayout>

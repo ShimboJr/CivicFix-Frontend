@@ -55,6 +55,7 @@ export default function IssueDetail() {
 
   const [issue,      setIssue]      = useState(null);
   const [comments,   setComments]   = useState([]);
+  const [auditLog,   setAuditLog]   = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState('');
   const [notFound,   setNotFound]   = useState(false); // true on 404 or stale id
@@ -87,6 +88,15 @@ export default function IssueDetail() {
         }
       })
       .finally(() => setLoading(false));
+  }, [id]);
+
+  // ── Load audit log (separate fetch — non-blocking, best-effort) ────────────────
+  // If this fails we just show an empty log rather than breaking the page.
+  useEffect(() => {
+    if (!id || id === 'null' || id === 'undefined') return;
+    api.get(`/issues/${id}/audit-log`)
+      .then(({ data }) => setAuditLog(data))
+      .catch(() => {}); // non-critical — stepper still works without it
   }, [id]);
 
   // ── Upvote toggle ─────────────────────────────────────────────────────────
@@ -566,6 +576,69 @@ export default function IssueDetail() {
                 </div>
               )}
             </div>
+
+            {/* ── Real change history (audit log) ────────────────────────────
+                 Shown below the visual stepper as a proper historical record.
+                 Empty log means no status changes have been recorded yet (e.g.
+                 the issue is still Pending or predates the audit log feature). */}
+            {auditLog.length > 0 && (
+              <div style={{ marginTop: '1.25rem', borderTop: '1px solid var(--cf-border-light)', paddingTop: '1rem' }}>
+                <p style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--cf-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>
+                  Change History
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                  {auditLog.map((entry) => (
+                    <div key={entry._id} style={{
+                      padding: '0.6rem 0.75rem',
+                      background: 'var(--cf-bg)',
+                      borderRadius: 'var(--cf-radius-md)',
+                      border: '1px solid var(--cf-border-light)',
+                      fontSize: '0.8rem',
+                    }}>
+                      {/* who + when */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.3rem', flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--cf-text)' }}>
+                          {entry.changedBy?.name || 'Unknown'}
+                        </span>
+                        {entry.changedBy?.role && entry.changedBy.role !== 'resident' && (
+                          <span style={{
+                            fontSize: '0.68rem', fontWeight: 600,
+                            background: entry.changedBy.role === 'staff' ? '#d1fae5' : 'var(--cf-primary-light)',
+                            color:      entry.changedBy.role === 'staff' ? '#065f46' : 'var(--cf-primary)',
+                            padding: '0.1rem 0.4rem', borderRadius: 999,
+                          }}>
+                            {entry.changedBy.role}
+                          </span>
+                        )}
+                        <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: 'var(--cf-text-muted)', whiteSpace: 'nowrap' }}>
+                          {formatDate(entry.createdAt)}
+                        </span>
+                      </div>
+                      {/* transition arrow */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--cf-text-secondary)' }}>
+                        <span style={{ background: 'var(--cf-border-light)', padding: '0.1rem 0.45rem', borderRadius: 4, fontSize: '0.75rem' }}>
+                          {entry.fromStatus}
+                        </span>
+                        <i className="bi bi-arrow-right" style={{ fontSize: '0.7rem', color: 'var(--cf-text-muted)' }} />
+                        <span style={{
+                          background: entry.toStatus === 'Rejected' ? '#fee2e2' : entry.toStatus === 'Resolved' ? '#d1fae5' : 'var(--cf-primary-light)',
+                          color:      entry.toStatus === 'Rejected' ? '#b91c1c' : entry.toStatus === 'Resolved' ? '#065f46' : 'var(--cf-primary)',
+                          padding: '0.1rem 0.45rem', borderRadius: 4, fontSize: '0.75rem', fontWeight: 600,
+                        }}>
+                          {entry.toStatus}
+                        </span>
+                      </div>
+                      {/* rejection reason */}
+                      {entry.reason && (
+                        <p style={{ margin: '0.35rem 0 0', fontSize: '0.75rem', color: 'var(--cf-text-secondary)', fontStyle: 'italic' }}>
+                          “{entry.reason}”
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Meta */}
