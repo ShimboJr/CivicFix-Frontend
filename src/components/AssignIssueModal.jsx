@@ -2,26 +2,30 @@ import { useEffect, useState } from 'react';
 import api from '../services/api';
 
 /**
- * AssignIssueModal
- * Props:
- *  - issue      {object}    — the issue being assigned
- *  - onClose    {function}  — close without action
- *  - onAssigned {function}  — called after a successful assignment
+ * AssignIssueModal — single-issue OR bulk-assign mode.
  *
- * Staff are fetched from GET /api/admin/staff-workload, which returns them
- * sorted lightest-load-first and includes their active issue count.  That
- * ordering is preserved here — the list is NOT re-sorted by name.
+ * ── Single mode ──────────────────────────────────────────────────────────────
+ *   Props: issueId (string), issue (object, for the summary card), onClose, onAssigned
+ *   Calls: PATCH /api/admin/issues/:id/assign   { staffId }
+ *   onAssigned() called with no argument after success.
  *
- * An admin CAN still assign to an overloaded staff member if they choose;
- * the badge is informational only.  Locking assignment would remove control
- * from the admin, which is the wrong trade-off.
+ * ── Bulk mode ─────────────────────────────────────────────────────────────────
+ *   Props: issueIds (string[]), onClose, onAssigned
+ *   Calls: POST  /api/admin/issues/bulk-assign  { issueIds, staffId }
+ *   onAssigned(result) called with the { succeeded, skipped } summary so the
+ *   parent (ManageIssues) can display "N assigned, M skipped" feedback.
+ *
+ * The staff picker, workload badges, and high-load warning are identical in
+ * both modes — no logic duplication.
  */
 
 // Number of active issues at which a staff member is considered high-load.
-// Surfaced as a named constant so it's easy to tune without hunting magic numbers.
 const HIGH_WORKLOAD_THRESHOLD = 5;
 
-export default function AssignIssueModal({ issue, onClose, onAssigned }) {
+export default function AssignIssueModal({ issue, issueId, issueIds, onClose, onAssigned }) {
+  // Determine mode from props
+  const isBulk = Array.isArray(issueIds) && issueIds.length > 0;
+
   const [staffList,  setStaffList]  = useState([]);
   const [selected,   setSelected]   = useState('');
   const [loading,    setLoading]    = useState(true);
@@ -40,19 +44,24 @@ export default function AssignIssueModal({ issue, onClose, onAssigned }) {
     if (!selected) return;
     setSubmitting(true); setError('');
     try {
-      await api.patch(`/admin/issues/${issue._id}/assign`, { staffId: selected });
-      onAssigned();
+      if (isBulk) {
+        const { data } = await api.post('/admin/issues/bulk-assign', {
+          issueIds,
+          staffId: selected,
+        });
+        onAssigned(data); // pass { succeeded, skipped } up to parent
+      } else {
+        await api.patch(`/admin/issues/${issueId || issue?._id}/assign`, { staffId: selected });
+        onAssigned(); // single-issue: no result to surface here
+      }
     } catch (err) { setError(err.message); }
     finally { setSubmitting(false); }
   };
 
   // ── Badge appearance ──────────────────────────────────────────────────────
-  // Normal  : subtle primary-tinted pill
-  // High    : amber — already loaded, admin should notice
-  // Critical: red   — at or above threshold, visually distinct at a glance
   const badgeStyle = (count) => {
     const isHigh     = count >= HIGH_WORKLOAD_THRESHOLD;
-    const isCritical = count >= HIGH_WORKLOAD_THRESHOLD + 2; // ≥ 7 = clearly overloaded
+    const isCritical = count >= HIGH_WORKLOAD_THRESHOLD + 2;
     return {
       display:      'inline-flex',
       alignItems:   'center',
@@ -83,7 +92,7 @@ export default function AssignIssueModal({ issue, onClose, onAssigned }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
           <h3 style={{ margin: 0, fontSize: '1.05rem' }}>
             <i className="bi bi-person-check me-2" style={{ color: 'var(--cf-primary)' }}></i>
-            Assign Issue
+            {isBulk ? `Assign ${issueIds.length} Issues` : 'Assign Issue'}
           </h3>
           <button
             onClick={onClose}
@@ -93,16 +102,30 @@ export default function AssignIssueModal({ issue, onClose, onAssigned }) {
           </button>
         </div>
 
-        {/* Issue summary */}
-        <div style={{ background: 'var(--cf-bg)', borderRadius: 'var(--cf-radius-md)', padding: '0.7rem 0.9rem', marginBottom: '1.1rem' }}>
-          <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--cf-primary)', marginBottom: '0.25rem' }}>
-            {issue.issueId}
+        {/* Context summary */}
+        {isBulk ? (
+          /* Bulk mode: show count + skip warning */
+          <div style={{ background: 'var(--cf-bg)', borderRadius: 'var(--cf-radius-md)', padding: '0.7rem 0.9rem', marginBottom: '1.1rem' }}>
+            <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+              <i className="bi bi-layers me-1" style={{ color: 'var(--cf-primary)' }} />
+              {issueIds.length} issue{issueIds.length !== 1 ? 's' : ''} selected
+            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--cf-text-muted)', marginTop: '0.25rem' }}>
+              Already-resolved issues will be skipped automatically.
+            </div>
           </div>
-          <div style={{ fontWeight: 600, fontSize: '0.9rem', lineHeight: 1.4 }}>{issue.title}</div>
-          <div style={{ fontSize: '0.78rem', color: 'var(--cf-text-muted)', marginTop: '0.25rem' }}>
-            <i className="bi bi-geo-alt me-1"></i>{issue.location?.address}
+        ) : issue ? (
+          /* Single mode: show the issue summary card */
+          <div style={{ background: 'var(--cf-bg)', borderRadius: 'var(--cf-radius-md)', padding: '0.7rem 0.9rem', marginBottom: '1.1rem' }}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--cf-primary)', marginBottom: '0.25rem' }}>
+              {issue.issueId}
+            </div>
+            <div style={{ fontWeight: 600, fontSize: '0.9rem', lineHeight: 1.4 }}>{issue.title}</div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--cf-text-muted)', marginTop: '0.25rem' }}>
+              <i className="bi bi-geo-alt me-1"></i>{issue.location?.address}
+            </div>
           </div>
-        </div>
+        ) : null}
 
         {error && (
           <div className="cf-alert cf-alert-error" style={{ marginBottom: '1rem' }}>
@@ -114,18 +137,13 @@ export default function AssignIssueModal({ issue, onClose, onAssigned }) {
         <div style={{ marginBottom: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
             <label className="cf-form-label" style={{ margin: 0 }}>Assign to staff member</label>
-            {/* Legend — only shown once data is loaded */}
             {!loading && staffList.length > 0 && (
-              <span style={{ fontSize: '0.68rem', color: 'var(--cf-text-muted)' }}>
-                sorted by current load ↑
-              </span>
+              <span style={{ fontSize: '0.68rem', color: 'var(--cf-text-muted)' }}>sorted by current load ↑</span>
             )}
           </div>
 
           {loading ? (
-            <div style={{ color: 'var(--cf-text-muted)', fontSize: '0.875rem', padding: '0.5rem 0' }}>
-              Loading staff…
-            </div>
+            <div style={{ color: 'var(--cf-text-muted)', fontSize: '0.875rem', padding: '0.5rem 0' }}>Loading staff…</div>
           ) : staffList.length === 0 ? (
             <div className="cf-alert cf-alert-error">No staff members found. Promote a user to staff first.</div>
           ) : (
@@ -139,35 +157,29 @@ export default function AssignIssueModal({ issue, onClose, onAssigned }) {
                     type="button"
                     onClick={() => setSelected(u._id)}
                     style={{
-                      display:        'flex',
-                      alignItems:     'center',
-                      gap:            '0.65rem',
-                      width:          '100%',
-                      padding:        '0.6rem 0.8rem',
-                      borderRadius:   'var(--cf-radius-md)',
-                      border:         `2px solid ${isSelected ? 'var(--cf-primary)' : 'var(--cf-border)'}`,
-                      background:     isSelected ? 'var(--cf-primary-light)' : 'var(--cf-bg)',
-                      cursor:         'pointer',
-                      textAlign:      'left',
-                      transition:     'border-color 120ms, background 120ms',
+                      display:     'flex',
+                      alignItems:  'center',
+                      gap:         '0.65rem',
+                      width:       '100%',
+                      padding:     '0.6rem 0.8rem',
+                      borderRadius: 'var(--cf-radius-md)',
+                      border:      `2px solid ${isSelected ? 'var(--cf-primary)' : 'var(--cf-border)'}`,
+                      background:  isSelected ? 'var(--cf-primary-light)' : 'var(--cf-bg)',
+                      cursor:      'pointer',
+                      textAlign:   'left',
+                      transition:  'border-color 120ms, background 120ms',
                     }}
-                    onMouseEnter={(e) => {
-                      if (!isSelected) e.currentTarget.style.borderColor = 'var(--cf-primary)';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isSelected) e.currentTarget.style.borderColor = 'var(--cf-border)';
-                    }}
+                    onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.borderColor = 'var(--cf-primary)'; }}
+                    onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.borderColor = 'var(--cf-border)'; }}
                   >
-                    {/* Selection indicator dot */}
+                    {/* Radio dot */}
                     <div style={{
                       width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
                       border:     `2px solid ${isSelected ? 'var(--cf-primary)' : 'var(--cf-border)'}`,
                       background: isSelected ? 'var(--cf-primary)' : 'transparent',
-                      display:    'flex', alignItems: 'center', justifyContent: 'center',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
-                      {isSelected && (
-                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />
-                      )}
+                      {isSelected && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
                     </div>
 
                     {/* Name + email */}
@@ -195,7 +207,7 @@ export default function AssignIssueModal({ issue, onClose, onAssigned }) {
             </div>
           )}
 
-          {/* High-load warning — shown only when the selected staff is at threshold */}
+          {/* High-load inline warning — shown when selected staff is at/above threshold */}
           {selected && (() => {
             const pick = staffList.find((u) => u._id === selected);
             return pick && pick.activeCount >= HIGH_WORKLOAD_THRESHOLD ? (
@@ -224,7 +236,9 @@ export default function AssignIssueModal({ issue, onClose, onAssigned }) {
             className="cf-btn cf-btn-primary"
             style={{ flex: 1 }}
           >
-            {submitting ? 'Assigning…' : <><i className="bi bi-person-check"></i> Assign</>}
+            {submitting
+              ? <><span className="spinner-border spinner-border-sm me-2"></span>Assigning…</>
+              : <><i className="bi bi-person-check"></i> {isBulk ? `Assign ${issueIds.length}` : 'Assign'}</>}
           </button>
           <button onClick={onClose} className="cf-btn cf-btn-outline" style={{ flex: 1 }}>
             Cancel
