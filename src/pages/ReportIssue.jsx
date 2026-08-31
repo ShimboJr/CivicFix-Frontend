@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import api from '../services/api';
 import DashboardLayout   from '../components/DashboardLayout';
 import LocationPicker    from '../components/LocationPicker';
+import StatusBadge       from '../components/StatusBadge';
 
 const SEVERITY_HINTS = {
   Low:      'Minor inconvenience — e.g. a broken park bench or faded road markings.',
@@ -12,6 +13,10 @@ const SEVERITY_HINTS = {
 };
 
 const MAX_IMAGES = 5;
+
+// How long to wait after the last change before firing the nearby check.
+// 800 ms feels instant enough without hammering the API on every map drag.
+const NEARBY_DEBOUNCE_MS = 800;
 
 export default function ReportIssue() {
   const navigate = useNavigate();
@@ -29,6 +34,13 @@ export default function ReportIssue() {
   const [success,    setSuccess]    = useState(null); // { issueId, id }
   const fileRef = useRef();
 
+  // ── Nearby duplicate detection state ──────────────────────────────────────
+  const [nearbyIssues,  setNearbyIssues]  = useState([]);   // array of matches
+  const [nearbyLoading, setNearbyLoading] = useState(false);
+  // Per-issue upvote state: { [issueId]: 'idle' | 'loading' | 'done' | 'already' }
+  const [upvoteState,   setUpvoteState]   = useState({});
+  const nearbyTimer = useRef(null);
+
   // ── Fetch categories on mount ─────────────────────────────────────────────
   useEffect(() => {
     api.get('/categories')
@@ -36,12 +48,49 @@ export default function ReportIssue() {
       .catch(() => {});
   }, []);
 
+  // ── Debounced nearby check ────────────────────────────────────────────────
+  // Fires only when BOTH category and coordinates are set, after the user
+  // pauses for NEARBY_DEBOUNCE_MS ms.  Cancelled on unmount.
+  const scheduleNearbyCheck = useCallback((category, latitude, longitude) => {
+    if (nearbyTimer.current) clearTimeout(nearbyTimer.current);
+
+    // Need all three before bothering the server
+    if (!category || latitude == null || longitude == null) {
+      setNearbyIssues([]);
+      return;
+    }
+
+    nearbyTimer.current = setTimeout(async () => {
+      setNearbyLoading(true);
+      try {
+        const { data } = await api.get('/issues/nearby', {
+          params: { latitude, longitude, category },
+        });
+        setNearbyIssues(data);
+      } catch {
+        // Non-critical — if it fails, just show nothing
+        setNearbyIssues([]);
+      } finally {
+        setNearbyLoading(false);
+      }
+    }, NEARBY_DEBOUNCE_MS);
+  }, []);
+
+  // Cancel the timer on unmount to prevent state updates on an unmounted component
+  useEffect(() => () => { if (nearbyTimer.current) clearTimeout(nearbyTimer.current); }, []);
+
   // ── Field change ──────────────────────────────────────────────────────────
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm((p) => ({ ...p, [name]: value }));
+    const next = { ...form, [name]: value };
+    setForm(next);
     if (errors[name]) setErrors((p) => ({ ...p, [name]: '' }));
     setApiError('');
+
+    // Re-run nearby check when category changes (lat/lng already set)
+    if (name === 'category') {
+      scheduleNearbyCheck(value, form.latitude, form.longitude);
+    }
   };
 
   // ── Image selection ───────────────────────────────────────────────────────
@@ -111,6 +160,25 @@ export default function ReportIssue() {
     }
   };
 
+  // ── Upvote an existing nearby issue instead of submitting a duplicate ──────
+  const handleUpvoteInstead = async (issue) => {
+    setUpvoteState((p) => ({ ...p, [issue._id]: 'loading' }));
+    try {
+      await api.post(`/issues/${issue._id}/upvote`);
+      setUpvoteState((p) => ({ ...p, [issue._id]: 'done' }));
+      // Update the count optimistically in the nearby list
+      setNearbyIssues((prev) =>
+        prev.map((i) =>
+          i._id === issue._id ? { ...i, upvoteCount: i.upvoteCount + 1 } : i
+        )
+      );
+    } catch (err) {
+      // 409 typically means already upvoted
+      const alreadyVoted = err.response?.status === 409 || err.message?.toLowerCase().includes('already');
+      setUpvoteState((p) => ({ ...p, [issue._id]: alreadyVoted ? 'already' : 'idle' }));
+    }
+  };
+
   // ── Success state ─────────────────────────────────────────────────────────
   if (success) {
     return (
@@ -144,7 +212,12 @@ export default function ReportIssue() {
             </button>
             <button
               className="cf-btn cf-btn-outline"
-              onClick={() => { setSuccess(null); setForm({ title: '', description: '', category: '', severity: 'Medium', address: '', latitude: null, longitude: null }); setImages([]); setPreviews([]); }}
+              onClick={() => {
+                setSuccess(null);
+                setForm({ title: '', description: '', category: '', severity: 'Medium', address: '', latitude: null, longitude: null });
+                setImages([]); setPreviews([]);
+                setNearbyIssues([]); setUpvoteState({});
+              }}
             >
               <i className="bi bi-plus-circle"></i> Report Another
             </button>
@@ -235,11 +308,148 @@ export default function ReportIssue() {
                   setForm((p) => ({ ...p, address, latitude, longitude }));
                   if (errors.address) setErrors((p) => ({ ...p, address: '' }));
                   setApiError('');
+                  // Trigger nearby check when location changes
+                  scheduleNearbyCheck(form.category, latitude, longitude);
                 }}
               />
               {errors.address && <p className="cf-field-error">{errors.address}</p>}
             </div>
           </div>
+
+          {/* ── Similar reports nearby panel ──────────────────────────────── */}
+          {/* Shows only when the check returns results.                      */}
+          {/* Never blocks submission — it's a suggestion, not a gate.        */}
+          {(nearbyLoading || nearbyIssues.length > 0) && (
+            <div style={{
+              marginBottom: '1rem',
+              border: '1.5px solid #f59e0b',
+              borderRadius: 'var(--cf-radius-md)',
+              overflow: 'hidden',
+            }}>
+              {/* Panel header */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '0.6rem',
+                padding: '0.7rem 1rem',
+                background: '#fef3c7',
+                borderBottom: nearbyIssues.length > 0 ? '1px solid #fde68a' : 'none',
+              }}>
+                <i className="bi bi-exclamation-triangle-fill" style={{ color: '#d97706', fontSize: '1rem', flexShrink: 0 }} />
+                <div>
+                  <span style={{ fontWeight: 700, fontSize: '0.875rem', color: '#92400e' }}>
+                    Similar reports nearby
+                  </span>
+                  <span style={{ fontSize: '0.78rem', color: '#a16207', marginLeft: '0.5rem' }}>
+                    — upvote an existing one instead if it's the same issue
+                  </span>
+                </div>
+                {nearbyLoading && (
+                  <div className="cf-spinner" style={{ width: 16, height: 16, marginLeft: 'auto', borderWidth: 2 }} />
+                )}
+              </div>
+
+              {/* Match list */}
+              {nearbyIssues.length > 0 && (
+                <div style={{ background: 'var(--cf-surface)' }}>
+                  {nearbyIssues.map((issue, idx) => {
+                    const state = upvoteState[issue._id] || 'idle';
+                    const isDone    = state === 'done';
+                    const isAlready = state === 'already';
+                    const isLoading = state === 'loading';
+
+                    return (
+                      <div key={issue._id} style={{
+                        display: 'flex', alignItems: 'flex-start', gap: '0.75rem',
+                        padding: '0.75rem 1rem',
+                        borderTop: idx > 0 ? '1px solid var(--cf-border-light)' : 'none',
+                        background: isDone || isAlready ? '#f0fdf4' : 'transparent',
+                        transition: 'background 200ms',
+                      }}>
+                        {/* Issue info */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
+                            <Link
+                              to={`/issue/${issue._id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--cf-text)', textDecoration: 'none' }}
+                              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--cf-primary)'}
+                              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--cf-text)'}
+                            >
+                              {issue.title}
+                            </Link>
+                            <StatusBadge status={issue.status} />
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem', fontSize: '0.75rem', color: 'var(--cf-text-muted)' }}>
+                            <span style={{ fontFamily: 'monospace', color: 'var(--cf-primary)', fontWeight: 600 }}>
+                              {issue.issueId}
+                            </span>
+                            <span>
+                              <i className="bi bi-hand-thumbs-up me-1" />
+                              {issue.upvoteCount} {issue.upvoteCount === 1 ? 'person' : 'people'} affected
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Upvote action */}
+                        <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                          {isDone ? (
+                            <div style={{ fontSize: '0.78rem', color: '#065f46', fontWeight: 600 }}>
+                              <i className="bi bi-check-circle-fill me-1" />
+                              Upvoted!{' '}
+                              <Link to={`/issue/${issue._id}`} target="_blank" style={{ color: 'var(--cf-primary)', textDecoration: 'underline', fontWeight: 400 }}>
+                                View
+                              </Link>
+                            </div>
+                          ) : isAlready ? (
+                            <div style={{ fontSize: '0.78rem', color: 'var(--cf-text-muted)' }}>
+                              <i className="bi bi-check2 me-1" />
+                              Already upvoted
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleUpvoteInstead(issue)}
+                              disabled={isLoading}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: '0.35rem',
+                                padding: '0.35rem 0.75rem',
+                                borderRadius: 'var(--cf-radius-md)',
+                                border: '1.5px solid var(--cf-primary)',
+                                background: 'transparent',
+                                color: 'var(--cf-primary)',
+                                fontWeight: 600, fontSize: '0.78rem',
+                                cursor: isLoading ? 'wait' : 'pointer',
+                                opacity: isLoading ? 0.7 : 1,
+                                transition: 'background 120ms, color 120ms',
+                                whiteSpace: 'nowrap',
+                              }}
+                              onMouseEnter={(e) => { if (!isLoading) { e.currentTarget.style.background = 'var(--cf-primary)'; e.currentTarget.style.color = '#fff'; }}}
+                              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--cf-primary)'; }}
+                            >
+                              {isLoading
+                                ? <><span className="spinner-border spinner-border-sm" style={{ width: 12, height: 12, borderWidth: 2 }} /> Upvoting…</>
+                                : <><i className="bi bi-hand-thumbs-up" /> This is the same issue</>}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Explicit "continue anyway" affordance */}
+                  <div style={{
+                    padding: '0.55rem 1rem',
+                    borderTop: '1px solid var(--cf-border-light)',
+                    fontSize: '0.76rem', color: 'var(--cf-text-muted)',
+                    background: 'var(--cf-bg)',
+                  }}>
+                    <i className="bi bi-info-circle me-1" />
+                    If your issue is different, continue and submit your own report below.
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Image upload */}
           <div className="cf-card" style={{ marginBottom: '1.25rem' }}>
