@@ -14,6 +14,7 @@ import PublicIssues   from './pages/PublicIssues';
 // Resident pages
 import ResidentDashboard from './pages/ResidentDashboard';
 import ReportIssue       from './pages/ReportIssue';
+import ReportEmergency   from './pages/ReportEmergency';
 import MyReports         from './pages/MyReports';
 import IssueDetail       from './pages/IssueDetail';
 import Notifications     from './pages/Notifications';
@@ -56,6 +57,7 @@ export default function App() {
           <Route path="/dashboard"             element={<ProtectedRoute allowedRoles={['resident']}><ResidentDashboard /></ProtectedRoute>} />
           <Route path="/dashboard/report"      element={<ProtectedRoute allowedRoles={['resident']}><ReportIssue /></ProtectedRoute>} />
           <Route path="/dashboard/my-reports"  element={<ProtectedRoute allowedRoles={['resident']}><MyReports /></ProtectedRoute>} />
+          <Route path="/dashboard/report-emergency" element={<ProtectedRoute allowedRoles={['resident']}><ReportEmergency /></ProtectedRoute>} />
 
           {/* ── Admin zone ─────────────────────────────────────────────────── */}
           <Route path="/admin"              element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>} />

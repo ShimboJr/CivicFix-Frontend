@@ -33,10 +33,12 @@ const ROLE_CONFIG = {
     sectionLabel: 'Resident Portal',
     avatarBg:     'var(--cf-accent)',
     nav: [
-      { to: '/dashboard',            icon: 'bi-house',          label: 'Overview',        end: true },
-      { to: '/dashboard/report',     icon: 'bi-plus-circle',    label: 'Report Issue' },
-      { to: '/dashboard/my-reports', icon: 'bi-card-checklist', label: 'My Reports' },
-      { to: '/map',                  icon: 'bi-map',            label: 'Community Map' },
+      { to: '/dashboard',              icon: 'bi-house',           label: 'Overview',        end: true },
+      { to: '/dashboard/report',       icon: 'bi-plus-circle',     label: 'Report Issue' },
+      { to: '/dashboard/my-reports',   icon: 'bi-card-checklist',  label: 'My Reports' },
+      { to: '/map',                    icon: 'bi-map',             label: 'Community Map' },
+      // Emergency link — visually distinct from routine nav items
+      { to: '/dashboard/report-emergency', icon: 'bi-exclamation-triangle-fill', label: 'Report Emergency', emergency: true },
     ],
   },
   admin: {
@@ -80,32 +82,70 @@ function NavItems({ cfg, onLinkClick }) {
         {cfg.sectionLabel}
       </p>
 
-      {cfg.nav.map(({ to, icon, label, end }) => (
-        <NavLink
-          key={to}
-          to={to}
-          end={end}
-          onClick={onLinkClick}
-          style={({ isActive }) => ({
-            display: 'flex', alignItems: 'center', gap: '0.65rem',
-            padding: '0.58rem 0.75rem', borderRadius: 8, marginBottom: '0.2rem',
-            color:      isActive ? '#fff' : 'rgba(255,255,255,0.62)',
-            background: isActive ? 'rgba(255,255,255,0.14)' : 'transparent',
-            fontWeight: isActive ? 600 : 400,
-            fontSize:   '0.9rem', textDecoration: 'none',
-            transition: 'background 140ms, color 140ms',
-          })}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(255,255,255,0.09)';
-          }}
-          onMouseLeave={(e) => {
-            const active = e.currentTarget.getAttribute('aria-current') === 'page';
-            e.currentTarget.style.background = active ? 'rgba(255,255,255,0.14)' : 'transparent';
-          }}
-        >
-          <i className={`bi ${icon}`} style={{ fontSize: '1rem', flexShrink: 0 }} />
-          {label}
-        </NavLink>
+      {cfg.nav.map(({ to, icon, label, end, emergency }) => (
+        emergency
+          /* ── Emergency link: always red, never blends with routine items ── */
+          ? (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              onClick={onLinkClick}
+              style={({ isActive }) => ({
+                display: 'flex', alignItems: 'center', gap: '0.65rem',
+                padding: '0.58rem 0.75rem',
+                borderRadius: 8, marginBottom: '0.2rem',
+                // Active: solid red; Inactive: red-tinted with border
+                color:      '#fff',
+                background: isActive ? '#b91c1c' : 'rgba(239,68,68,0.18)',
+                border:     isActive ? '1px solid #b91c1c' : '1px solid rgba(239,68,68,0.45)',
+                fontWeight: 700,
+                fontSize:   '0.9rem', textDecoration: 'none',
+                transition: 'background 140ms, border-color 140ms',
+                marginTop:  '0.5rem', // extra gap above emergency link
+              })}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#b91c1c';
+                e.currentTarget.style.borderColor = '#b91c1c';
+              }}
+              onMouseLeave={(e) => {
+                const active = e.currentTarget.getAttribute('aria-current') === 'page';
+                e.currentTarget.style.background  = active ? '#b91c1c' : 'rgba(239,68,68,0.18)';
+                e.currentTarget.style.borderColor = active ? '#b91c1c' : 'rgba(239,68,68,0.45)';
+              }}
+            >
+              <i className={`bi ${icon}`} style={{ fontSize: '1rem', flexShrink: 0 }} />
+              {label}
+            </NavLink>
+          )
+          /* ── Regular nav link ──────────────────────────────────────────── */
+          : (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              onClick={onLinkClick}
+              style={({ isActive }) => ({
+                display: 'flex', alignItems: 'center', gap: '0.65rem',
+                padding: '0.58rem 0.75rem', borderRadius: 8, marginBottom: '0.2rem',
+                color:      isActive ? '#fff' : 'rgba(255,255,255,0.62)',
+                background: isActive ? 'rgba(255,255,255,0.14)' : 'transparent',
+                fontWeight: isActive ? 600 : 400,
+                fontSize:   '0.9rem', textDecoration: 'none',
+                transition: 'background 140ms, color 140ms',
+              })}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.09)';
+              }}
+              onMouseLeave={(e) => {
+                const active = e.currentTarget.getAttribute('aria-current') === 'page';
+                e.currentTarget.style.background = active ? 'rgba(255,255,255,0.14)' : 'transparent';
+              }}
+            >
+              <i className={`bi ${icon}`} style={{ fontSize: '1rem', flexShrink: 0 }} />
+              {label}
+            </NavLink>
+          )
       ))}
     </>
   );
