@@ -36,11 +36,6 @@
  *            sidestepping Vercel's platform-level ~4.5 MB request body limit.
  *   Phase 3: Submit the report as a plain JSON POST (title/description/location/
  *            media array of Cloudinary URLs) — no file bytes in this request.
- *
- * NOTE (gallery path):
- *   Client-side compression for gallery-selected videos (e.g. via ffmpeg.wasm)
- *   would be valuable here to reduce upload size, but the library adds ~20 MB to
- *   the bundle.  Flagged as a follow-up.
  */
 
 import { useRef, useState, useCallback, useEffect } from 'react';
