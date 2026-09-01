@@ -343,6 +343,13 @@ export default function ReportEmergency() {
     video.play().catch(() => {});
   }, [recording]);
 
+  // ── Diagnostic counter (Step 1 — remove after testing) ────────────────────
+  const _diagCounterRef = useRef(0);
+  const _diag = (label) => {
+    _diagCounterRef.current += 1;
+    console.log(`[REC-DIAG #${_diagCounterRef.current}] ${label}`);
+  };
+
   // ── MediaRecorder video capture ───────────────────────────────────────────
   const startRecording = async () => {
     setRecorderError('');
@@ -376,6 +383,7 @@ export default function ReportEmergency() {
         ...(mimeType ? { mimeType } : {}),
         videoBitsPerSecond: VIDEO_BITS_PER_SECOND,
       });
+      _diag('MediaRecorder CREATED'); // Step 1 diagnostic
     } catch (err) {
       stream.getTracks().forEach((t) => t.stop());
       activeStreamRef.current = null;
@@ -396,13 +404,15 @@ export default function ReportEmergency() {
     //   1. Builds the final Blob from accumulated chunks
     //   2. Pushes the evidence item into state
     //   3. Stops every track on the camera/mic stream (releases OS indicator)
-    //   4. Clears the countdown/fallback interval
-    //   5. Resets hasFinalizedRef to false for the next recording
+    //   4. Clears the countdown interval (hygiene — not correctness)
     //
-    // Trigger sites (Layer 1 timer, Layer 2 interval, manual Stop button)
-    // only call mediaRecorder.stop() — they never finalize themselves.
-    // hasFinalizedRef at the trigger sites is a "stop already requested?"
+    // Trigger sites (Layer 1 setTimeout, manual Stop button) only call
+    // mediaRecorder.stop() — they never finalize themselves.
+    // hasFinalizedRef at the trigger sites is a "has .stop() been called?"
     // gate only — it is NOT set to true there; only here.
+    //
+    // hasFinalizedRef is NOT reset to false here anymore (Step 2 fix).
+    // It stays true until startRecording() is called again for a new session.
     //
     // Layer 3 (client-side duration gate): after the Blob is assembled, load it
     // into a hidden <video> element and read its .duration.  If it somehow
@@ -412,10 +422,24 @@ export default function ReportEmergency() {
       // hasFinalizedRef is set HERE — nowhere else — so this guard only
       // triggers if the browser fires onstop more than once (which is
       // non-standard but possible).  Trigger sites never set this flag.
-      if (hasFinalizedRef.current) return;
+      //
+      // STEP 2 FIX: hasFinalizedRef.current is NOT reset to false here anymore.
+      // It stays true until the VERY NEXT recording session starts (i.e. after
+      // getUserMedia succeeds and a new MediaRecorder is constructed).  Resetting
+      // it inside onstop re-armed the guard while async callbacks (onloadedmetadata)
+      // and stale interval ticks were still in flight — allowing a second
+      // finalization to pass the check and add a duplicate evidence entry.
+      _diag('onstop ENTERED'); // Step 1 diagnostic
+      if (hasFinalizedRef.current) {
+        _diag('onstop BLOCKED by guard (duplicate event)'); // Step 1 diagnostic
+        return;
+      }
       hasFinalizedRef.current = true;
+      _diag('onstop PROCEEDING — hasFinalizedRef now true'); // Step 1 diagnostic
 
-      // 1. Kill timers — no further auto-stop ticks should fire.
+      // 1. Kill timers — good hygiene; stops wasted cycles.
+      //    Correctness no longer depends on this clearing being perfect:
+      //    the interval is now display-only (Step 3) and cannot call .stop().
       clearInterval(countdownTimerRef.current);
       clearTimeout(stopTimerRef.current);
 
@@ -437,8 +461,11 @@ export default function ReportEmergency() {
       setRecording(false);
       setCountdown(VIDEO_MAX_SECONDS);
 
-      // 5. Reset flag so the next recording session can finalize normally.
-      hasFinalizedRef.current = false;
+      // NOTE (Step 2): hasFinalizedRef.current is intentionally NOT reset here.
+      // It remains true until the next startRecording() call, after getUserMedia
+      // succeeds and a fresh MediaRecorder is constructed for the new session.
+      // This ensures any in-flight async callbacks or stale interval ticks that
+      // fire after onstop cannot pass the guard and produce a duplicate entry.
 
       // ── Layer 3: hidden-video duration check ─────────────────────────────
       const objectUrl = URL.createObjectURL(blob);
@@ -451,12 +478,14 @@ export default function ReportEmergency() {
           const dur = checker.duration;
           if (Number.isFinite(dur) && dur > VIDEO_MAX_SECONDS + 0.5) {
             // Duration exceeded even after both stop mechanisms — reject fast.
+            _diag('evidence REJECTED — duration exceeded'); // Step 1 diagnostic
             setRecorderError(
               `Recording exceeded the ${VIDEO_MAX_SECONDS}-second limit (got ${Math.round(dur)}s). ` +
               'Please try again — it will auto-stop at 15 seconds.'
             );
             // Do NOT add to mediaFiles.
           } else {
+            _diag('evidence PUSHED to mediaFiles (via onloadedmetadata)'); // Step 1 diagnostic
             addMediaFile(file, 'video');
           }
         };
@@ -465,20 +494,25 @@ export default function ReportEmergency() {
           // and let the server-side check be the backstop.
           URL.revokeObjectURL(objectUrl);
           checker.src = '';
+          _diag('evidence PUSHED to mediaFiles (via checker.onerror fallback)'); // Step 1 diagnostic
           addMediaFile(file, 'video');
         };
       } else {
         // Hidden checker element not in DOM (should not happen); accept and let
         // server verify.
         URL.revokeObjectURL(objectUrl);
+        _diag('evidence PUSHED to mediaFiles (no checker element)'); // Step 1 diagnostic
         addMediaFile(file, 'video');
       }
     };
 
     recorder.start(200);
     mediaRecorderRef.current = recorder;
-    elapsedSecondsRef.current = 0;   // reset elapsed counter for watchdog
+    // STEP 2 FIX: hasFinalizedRef is reset to false HERE — at the moment a brand
+    // new recording actually starts (after getUserMedia + new MediaRecorder) —
+    // and ONLY here.  It is NOT reset inside onstop anymore (see note above).
     hasFinalizedRef.current   = false; // new recording session — allow exactly one finalization
+    _diag('recorder.start() called — hasFinalizedRef reset to false'); // Step 1 diagnostic
     // setRecording(true) triggers a re-render.  After React commits the DOM,
     // the useEffect above fires and binds activeStreamRef.current to the
     // <video> element that has now mounted.
@@ -486,7 +520,7 @@ export default function ReportEmergency() {
     setCountdown(VIDEO_MAX_SECONDS);
 
     // ── Layer 1: primary auto-stop (setTimeout) ───────────────────────────
-    // Sole responsibility: call mediaRecorder.stop() if not already stopped.
+    // One of only TWO sites allowed to call mediaRecorder.stop().
     // ALL finalization (blob, evidence, stream release, UI reset) happens in
     // onstop — never here.  hasFinalizedRef is read only, never written here.
     clearTimeout(stopTimerRef.current);
@@ -494,37 +528,33 @@ export default function ReportEmergency() {
       // Guard: if onstop already ran (or another trigger already called
       // .stop() and onstop is in-flight), do nothing.
       if (hasFinalizedRef.current) return;
+      _diag('Layer 1 setTimeout FIRING — calling rec.stop()'); // Step 1 diagnostic
       const rec = mediaRecorderRef.current;
       if (rec && rec.state !== 'inactive') {
         rec.stop(); // triggers onstop → all finalization happens there
       }
     }, VIDEO_MAX_SECONDS * 1000);
 
-    // ── Layer 2: watchdog inside the countdown interval ────────────────────
-    // Sole responsibility: call mediaRecorder.stop() if Layer 1 somehow
-    // didn't fire by 15 s.  ALL finalization happens in onstop.
-    // hasFinalizedRef is read only, never written here.
+    // ── Countdown interval: DISPLAY-ONLY (Step 3) ────────────────────────
+    //
+    // STEP 3 FIX: this interval is now purely display-only.  It updates the
+    // visible countdown and REC badge — nothing else.  It does NOT call
+    // .stop() on the recorder, does NOT check hasFinalizedRef, and does NOT
+    // touch the evidence array in any way.
+    //
+    // The ONLY two sites that may call mediaRecorder.stop() are:
+    //   • Layer 1 setTimeout above
+    //   • The manual "Stop Recording" button (stopRecording callback)
+    // Both are guarded by hasFinalizedRef exactly as before.
+    //
+    // Consequence: even if this interval accumulates duplicate instances due
+    // to a React effect re-run, or is never cleared for some reason, it is
+    // completely harmless — it can never produce a duplicate evidence entry.
     countdownTimerRef.current = setInterval(() => {
-      elapsedSecondsRef.current += 1;
-      const elapsed = elapsedSecondsRef.current;
-
-      if (elapsed >= VIDEO_MAX_SECONDS) {
-        // Guard: if onstop already ran (or .stop() was already called by
-        // another trigger), bail without doing anything.
-        if (hasFinalizedRef.current) {
-          clearInterval(countdownTimerRef.current); // stale tick — clean up
-          return;
-        }
-        const rec = mediaRecorderRef.current;
-        if (rec && rec.state !== 'inactive') {
-          rec.stop(); // triggers onstop → all finalization happens there
-        }
-        return;
-      }
-
-      // Normal tick: decrement the visible countdown display.
+      _diag('interval TICK'); // Step 1 diagnostic — remove after testing
+      // Purely decrement the visible countdown display.
       setCountdown((prev) => {
-        if (prev <= 1) { clearInterval(countdownTimerRef.current); return 0; }
+        if (prev <= 1) return 0; // bottom out at 0; onstop will clear this interval
         return prev - 1;
       });
     }, 1000);
@@ -532,10 +562,11 @@ export default function ReportEmergency() {
 
   const stopRecording = useCallback(() => {
     // ── Manual Stop ───────────────────────────────────────────────────────
-    // Sole responsibility: call mediaRecorder.stop() if not already stopped.
+    // One of only TWO sites allowed to call mediaRecorder.stop().
     // ALL finalization (blob, evidence, stream release, UI reset) happens in
     // onstop — never here.  hasFinalizedRef is read only, never written here.
     if (hasFinalizedRef.current) return; // onstop already ran or .stop() already called
+    _diag('Manual stopRecording CALLED — calling rec.stop()'); // Step 1 diagnostic
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop(); // triggers onstop → all finalization happens there
     }
