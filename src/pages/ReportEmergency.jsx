@@ -23,14 +23,24 @@
  *   B. "Record Video (15s)"  — MediaRecorder API with enforced constraints:
  *                              720p, ~2 Mbps, auto-stop + countdown timer
  *   C. "Choose from Gallery" — plain file input (gallery videos bypass capture
- *                              constraints; server-side checks in Prompt 2 are
- *                              the backstop for oversized/overlong gallery files)
+ *                              constraints; server-side Admin API duration check
+ *                              in createEmergencyReport is the real backstop)
+ *
+ * Media upload flow (direct-to-Cloudinary, three phases):
+ *   Phase 0: Client-side pre-check — estimate video duration from file.size;
+ *            show a friendly error immediately for obviously-overlong clips.
+ *            (UX nicety only — not security; server re-verifies all durations.)
+ *   Phase 1: Fetch a server-signed upload payload from GET /upload-signature.
+ *   Phase 2: POST each file directly to Cloudinary's upload API using the
+ *            signature.  File bytes never pass through the serverless function,
+ *            sidestepping Vercel's platform-level ~4.5 MB request body limit.
+ *   Phase 3: Submit the report as a plain JSON POST (title/description/location/
+ *            media array of Cloudinary URLs) — no file bytes in this request.
  *
  * NOTE (gallery path):
  *   Client-side compression for gallery-selected videos (e.g. via ffmpeg.wasm)
  *   would be valuable here to reduce upload size, but the library adds ~20 MB to
- *   the bundle.  This is flagged as a follow-up; the server-side duration/size
- *   gate in emergencyUploadMiddleware.js is the current backstop.
+ *   the bundle.  Flagged as a follow-up.
  */
 
 import { useRef, useState, useCallback, useEffect } from 'react';
@@ -144,8 +154,12 @@ export default function ReportEmergency() {
   const [location,    setLocation]    = useState({ address: '', latitude: null, longitude: null });
   const [errors,      setErrors]      = useState({});
   const [apiError,    setApiError]    = useState('');
-  const [submitting,  setSubmitting]  = useState(false);
-  const [success,     setSuccess]     = useState(false);
+  // ── Upload progress state ───────────────────────────────────────────────
+  // null = not uploading; 0–100 = upload in progress
+  const [uploadProgress,  setUploadProgress]  = useState(null);
+  const [uploadStatus,    setUploadStatus]    = useState('');  // descriptive label
+  const [submitting,      setSubmitting]      = useState(false);
+  const [success,         setSuccess]         = useState(false);
 
   // ── Media state ──────────────────────────────────────────────────────────
   const [mediaFiles,  setMediaFiles]  = useState([]);
@@ -287,8 +301,6 @@ export default function ReportEmergency() {
 
     recorder.ondataavailable = (e) => {
       if (e.data?.size > 0) chunksRef.current.push(e.data);
-    };
-
     recorder.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: mimeType || 'video/webm' });
       const ext  = mimeType.includes('mp4') ? 'mp4' : 'webm';
@@ -336,35 +348,138 @@ export default function ReportEmergency() {
     return errs;
   };
 
-  // ── Submit ────────────────────────────────────────────────────────────────
+  // ── Submit (three-phase direct-to-Cloudinary upload) ─────────────────────
+  //
+  // Phase 0: Client-side pre-check on video file sizes (UX nicety, not security)
+  // Phase 1: Fetch a signed upload payload from the backend
+  // Phase 2: POST each file directly to Cloudinary (file bytes never touch
+  //          the serverless function — sidesteps Vercel's 4.5 MB body limit)
+  // Phase 3: Submit the report as a plain JSON POST with the Cloudinary URLs
   const handleSubmit = async (e) => {
     e.preventDefault();
     setApiError('');
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
 
-    const fd = new FormData();
-    fd.append('type',        type);
-    fd.append('description', description.trim());
-    fd.append('location',    JSON.stringify({
-      address:   location.address,
-      latitude:  location.latitude,
-      longitude: location.longitude,
-    }));
-    mediaFiles.forEach(({ file }) => fd.append('media', file));
+    // ── Phase 0: Client-side video size pre-check (UX gate, not enforcement) ──
+    // Estimate duration from file size at the 2 Mbps bitrate used by the
+    // MediaRecorder path.  Gallery videos may differ; this is intentionally
+    // approximate — the real check is server-side via the Cloudinary Admin API.
+    const VIDEO_BYTES_PER_SECOND = VIDEO_BITS_PER_SECOND / 8; // 250 000 B/s at 2 Mbps
+    const obviouslyOverlong = mediaFiles.filter(
+      ({ file, kind }) =>
+        kind === 'video' &&
+        file.size / VIDEO_BYTES_PER_SECOND > VIDEO_MAX_SECONDS + 5 // +5 s grace for compression
+    );
+    if (obviouslyOverlong.length) {
+      setApiError(
+        `One or more videos appear to be longer than ${VIDEO_MAX_SECONDS} seconds. ` +
+        'Please trim the clip before uploading. ' +
+        '(The server will verify the exact duration and reject anything over 15 s.)'
+      );
+      return;
+    }
 
     setSubmitting(true);
+    setUploadProgress(null);
+    setUploadStatus('');
+
     try {
-      await api.post('/emergency-reports', fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      // ── Phase 1: Fetch server-signed upload credentials ───────────────────
+      // The backend signs a { timestamp, folder } pair with CLOUDINARY_API_SECRET.
+      // We receive the signature + the public params needed for the upload POST.
+      // The secret itself is NEVER sent to the client.
+      setUploadStatus('Preparing upload…');
+      const { data: sig } = await api.get('/emergency-reports/upload-signature');
+      const { signature, timestamp, apiKey, cloudName, folder } = sig;
+
+      // ── Phase 2: POST each file directly to Cloudinary ────────────────────
+      // We reuse the SAME signature for all files in this submission — Cloudinary
+      // validates the timestamp+folder+signature triple for each upload.
+      const uploadedAssets = [];
+      const total = mediaFiles.length;
+
+      for (let i = 0; i < total; i++) {
+        const { file } = mediaFiles[i];
+        setUploadStatus(
+          total === 1
+            ? 'Uploading media…'
+            : `Uploading media (${i + 1}\u202f/\u202f${total})…`
+        );
+        setUploadProgress(Math.round((i / total) * 80)); // 0–80% is the upload phase
+
+        const fd = new FormData();
+        fd.append('file',      file);
+        fd.append('api_key',   apiKey);
+        fd.append('timestamp', timestamp);
+        fd.append('signature', signature);
+        fd.append('folder',    folder);
+
+        // POST directly to Cloudinary's upload endpoint using the native fetch API
+        // (not our axios instance) because this request goes to Cloudinary, not
+        // our backend, and we want Cloudinary's raw error body on failure.
+        const uploadRes = await fetch(
+          `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`,
+          { method: 'POST', body: fd }
+        );
+
+        if (!uploadRes.ok) {
+          const errBody = await uploadRes.json().catch(() => ({}));
+          throw new Error(
+            errBody.error?.message ||
+            `Media upload failed (HTTP ${uploadRes.status}) — please try again.`
+          );
+        }
+
+        const asset = await uploadRes.json();
+        // Cloudinary response fields we need:
+        //   asset.secure_url    — CDN URL to store in the DB
+        //   asset.public_id     — needed by the server to re-fetch authoritative duration
+        //   asset.resource_type — 'image' or 'video'
+        //   asset.duration      — seconds (present only for video resources)
+        uploadedAssets.push({
+          url:      asset.secure_url,
+          type:     asset.resource_type === 'video' ? 'video' : 'image',
+          publicId: asset.public_id,
+          // Include the Cloudinary-reported duration for reference;
+          // the server NEVER trusts this value — it re-fetches from Admin API.
+          ...(asset.resource_type === 'video' && typeof asset.duration === 'number'
+            ? { durationSeconds: asset.duration }
+            : {}),
+        });
+      }
+
+      // ── Phase 3: Submit report as plain JSON (no file bytes) ──────────────
+      // The final POST contains only small JSON — well under Vercel's body limit.
+      // The server re-fetches video durations from Cloudinary's Admin API and
+      // rejects (+ destroys) any clip > 15 s, even if the client lied.
+      setUploadProgress(90);
+      setUploadStatus('Submitting report…');
+
+      await api.post('/emergency-reports', {
+        type,
+        description: description.trim(),
+        location: {
+          address:   location.address,
+          latitude:  location.latitude,
+          longitude: location.longitude,
+        },
+        media: uploadedAssets,
+        // Content-Type: application/json is the axios instance default
       });
+
+      setUploadProgress(100);
       setSuccess(true);
+
     } catch (err) {
       setApiError(err.message || 'Submission failed — please try again.');
     } finally {
       setSubmitting(false);
+      setUploadProgress(null);
+      setUploadStatus('');
     }
   };
+
 
   // ── Success screen ────────────────────────────────────────────────────────
   if (success) {
@@ -638,10 +753,10 @@ export default function ReportEmergency() {
           <input ref={galleryRef} type="file" accept="video/mp4,video/webm,video/quicktime" style={{ display: 'none' }} onChange={handleGalleryPick} />
 
           {/* Actions */}
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <button type="submit" id="er-submit-btn" className="cf-btn" disabled={submitting || recording} style={{ background: '#b91c1c', color: '#fff' }}>
               {submitting
-                ? <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" /> Submitting…</>
+                ? <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" /> {uploadStatus || 'Submitting…'}</>
                 : <><i className="bi bi-send-fill" /> Submit Emergency Report</>
               }
             </button>
@@ -649,6 +764,28 @@ export default function ReportEmergency() {
               Cancel
             </button>
           </div>
+
+          {/* Upload progress bar — visible only during phases 1–2 */}
+          {submitting && uploadProgress !== null && (
+            <div style={{ marginTop: '0.75rem' }}>
+              <div style={{
+                height: 6, borderRadius: 3,
+                background: 'var(--cf-border-light)',
+                overflow: 'hidden',
+              }}>
+                <div style={{
+                  height: '100%',
+                  width: `${uploadProgress}%`,
+                  background: '#b91c1c',
+                  borderRadius: 3,
+                  transition: 'width 300ms ease',
+                }} />
+              </div>
+              <p style={{ fontSize: '0.75rem', color: 'var(--cf-text-muted)', marginTop: '0.3rem' }}>
+                {uploadStatus}
+              </p>
+            </div>
+          )}
 
         </form>
       </div>
