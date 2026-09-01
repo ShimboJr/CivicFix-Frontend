@@ -199,6 +199,24 @@ export default function ReportEmergency() {
   // Tracks elapsed recording seconds independently of the countdown display.
   // Used by the watchdog in the countdown interval as a second auto-stop layer.
   const elapsedSecondsRef = useRef(0);
+  // ── Single source of truth: has this recording session been finalized? ────
+  //
+  // ROOT CAUSE OF THE DUPLICATE-EVIDENCE BUG (confirmed):
+  //   After the redundant Layer 2 watchdog interval was added, the countdown
+  //   setInterval is not reliably cleared before it fires additional ticks past
+  //   the 15-second mark.  On each of those extra ticks the watchdog branch
+  //   re-runs: it sees rec.state !== 'inactive' (or does so transiently due to
+  //   async event timing), calls rec.stop() again, and each call fires onstop
+  //   again — producing an unbounded, continuously growing evidence list.
+  //
+  // Fix: hasFinalizedRef is set to true by whichever of the three stop paths
+  //   (Layer 1 setTimeout / Layer 2 interval watchdog / manual Stop button)
+  //   runs first.  Every path checks this flag BEFORE doing anything — calling
+  //   .stop(), saving the blob, or updating any state.  Only one path can ever
+  //   win; all subsequent paths are no-ops.  The interval is explicitly killed
+  //   at the same moment the flag is set, not left to clean up later.
+  //   Reset to false only when a NEW recording starts.
+  const hasFinalizedRef   = useRef(false);
   const photoRef          = useRef();
   const galleryRef        = useRef();
   // Hidden <video> element used for client-side duration check after recording.
@@ -381,6 +399,11 @@ export default function ReportEmergency() {
     // inside ondataavailable — nesting it would make it dead code that is
     // never registered as a handler on the MediaRecorder instance.
     //
+    // hasFinalizedRef guard: onstop can fire more than once if .stop() is
+    // called concurrently by two paths before either's readyState check had a
+    // chance to see 'inactive'.  The flag ensures only the first invocation
+    // does any work — all subsequent invocations are unconditional no-ops.
+    //
     // Layer 3 (client-side duration gate): after the Blob is assembled, load it
     // into a hidden <video> element and read its .duration.  If it somehow
     // exceeds VIDEO_MAX_SECONDS despite both stop mechanisms above, reject it
@@ -388,6 +411,16 @@ export default function ReportEmergency() {
     // This is a UX fast-fail only — the real hard backstop is the server-side
     // Cloudinary Admin API duration check already built during the 413 fix.
     recorder.onstop = () => {
+      // ── Idempotency guard ─────────────────────────────────────────────────
+      // If hasFinalizedRef is already true, some other path (Layer 1 timeout,
+      // Layer 2 watchdog, or manual Stop button) already ran finalization.
+      // Doing it again would push a duplicate to the evidence list.
+      if (hasFinalizedRef.current) return;
+      hasFinalizedRef.current = true;
+      // Belt-and-suspenders: kill the countdown interval here too so it cannot
+      // fire any more ticks after finalization is confirmed.
+      clearInterval(countdownTimerRef.current);
+
       const blob = new Blob(chunksRef.current, { type: mimeType || 'video/webm' });
       const ext  = mimeType.includes('mp4') ? 'mp4' : 'webm';
       const file = new File([blob], `emergency-video-${Date.now()}.${ext}`, { type: blob.type });
@@ -434,7 +467,8 @@ export default function ReportEmergency() {
 
     recorder.start(200);
     mediaRecorderRef.current = recorder;
-    elapsedSecondsRef.current = 0;  // reset elapsed counter for watchdog
+    elapsedSecondsRef.current = 0;   // reset elapsed counter for watchdog
+    hasFinalizedRef.current   = false; // new recording session — allow exactly one finalization
     // setRecording(true) triggers a re-render.  After React commits the DOM,
     // the useEffect above fires and binds activeStreamRef.current to the
     // <video> element that has now mounted.
@@ -452,13 +486,23 @@ export default function ReportEmergency() {
     // The cameraStream cleanup no longer calls stopAllTimers() (see above).
     clearTimeout(stopTimerRef.current);
     stopTimerRef.current = setTimeout(() => {
+      // ── Layer 1 guard: claim the finalization slot or bail ────────────────
+      // If the interval watchdog or the manual Stop button already ran, this
+      // path must do nothing — the recorder is already stopped and the blob
+      // is already being saved.  Setting the flag here (rather than reading
+      // it) would race; we must read first and only proceed if unclaimed.
+      if (hasFinalizedRef.current) return;
+      hasFinalizedRef.current = true;
+      // Kill the countdown interval immediately — it must not fire any more
+      // ticks after this path claims finalization.
+      clearInterval(countdownTimerRef.current);
+
       const rec = mediaRecorderRef.current;
       if (rec && rec.state !== 'inactive') {
-        rec.stop();
+        rec.stop(); // triggers onstop → blob save (onstop also checks the flag)
       }
       setRecording(false);
       setCountdown(VIDEO_MAX_SECONDS);
-      clearInterval(countdownTimerRef.current);
     }, VIDEO_MAX_SECONDS * 1000);
 
     // ── Layer 2: watchdog inside the countdown interval ────────────────────
@@ -470,20 +514,38 @@ export default function ReportEmergency() {
       elapsedSecondsRef.current += 1;
       const elapsed = elapsedSecondsRef.current;
 
-      // Watchdog: independent second enforcement at 15 s
+      // ── Layer 2 watchdog: independent 15 s enforcement ────────────────────
       if (elapsed >= VIDEO_MAX_SECONDS) {
-        const rec = mediaRecorderRef.current;
-        if (rec && rec.state !== 'inactive') {
-          // Layer 1 didn't fire (or fired concurrently) — stop from here.
-          rec.stop();
+        // Claim the finalization slot — if Layer 1 or manual Stop already ran,
+        // this entire branch is a no-op.  The flag check + set is the FIRST
+        // thing we do so the interval is killed and the recorder is stopped at
+        // most once, regardless of concurrency or timer ordering.
+        if (hasFinalizedRef.current) {
+          // Already finalized — this is a stale interval tick firing after
+          // another path already ran.  Stop the interval now so it never fires
+          // again (it should have been cleared already, but clearInterval here
+          // is cheap and eliminates any residual resource leak).
+          clearInterval(countdownTimerRef.current);
+          return;
         }
+        hasFinalizedRef.current = true;
+        // Kill both timers immediately — the setTimeout is no longer needed and
+        // must not call .stop() a second time after we do so below.
         clearInterval(countdownTimerRef.current);
         clearTimeout(stopTimerRef.current);
+
+        const rec = mediaRecorderRef.current;
+        if (rec && rec.state !== 'inactive') {
+          rec.stop(); // triggers onstop → blob save (onstop also checks the flag)
+        }
         setRecording(false);
         setCountdown(VIDEO_MAX_SECONDS);
         return;
       }
 
+      // Normal tick: decrement the visible countdown display.
+      // The clearInterval inside the updater is a redundant safety net for the
+      // display only — it does NOT replace the explicit clears above.
       setCountdown((prev) => {
         if (prev <= 1) { clearInterval(countdownTimerRef.current); return 0; }
         return prev - 1;
@@ -492,9 +554,17 @@ export default function ReportEmergency() {
   };
 
   const stopRecording = useCallback(() => {
+    // ── Manual Stop guard: claim the finalization slot or bail ────────────
+    // If an auto-stop path already ran, the recorder is already stopped and
+    // onstop is already assembling/saving the blob.  Doing it again would
+    // either throw (calling .stop() on an inactive recorder) or double-save.
+    if (hasFinalizedRef.current) return;
+    hasFinalizedRef.current = true;
+    // Kill both timers immediately — no further auto-stop ticks should fire.
     stopAllTimers();
+
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stop(); // triggers onstop → blob save (onstop also checks flag)
     }
     setRecording(false);
     setCountdown(VIDEO_MAX_SECONDS);
