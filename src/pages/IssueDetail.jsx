@@ -525,6 +525,24 @@ export default function IssueDetail() {
                   {issue.location.address}
                 </p>
               )}
+              {/* Directions link — /dir/ opens routing mode, not just a pin */}
+              <a
+                href={`https://www.google.com/maps/dir/?api=1&destination=${issue.location.latitude},${issue.location.longitude}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display:      'inline-flex',
+                  alignItems:   'center',
+                  gap:          '0.3rem',
+                  marginTop:    '0.55rem',
+                  fontSize:     '0.78rem',
+                  fontWeight:   600,
+                  color:        'var(--cf-primary)',
+                  textDecoration: 'none',
+                }}
+              >
+                <i className="bi bi-signpost-split-fill" /> Get Directions
+              </a>
             </div>
           )}
 

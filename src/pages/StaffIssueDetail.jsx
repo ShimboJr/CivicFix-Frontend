@@ -373,6 +373,55 @@ export default function StaffIssueDetail() {
             )}
           </div>
 
+          {/* Location — only when coordinates are stored.
+              Staff physically travel to these sites, so the directions link
+              is the highest-value action in this panel.                     */}
+          {issue.location?.latitude && issue.location?.longitude && (
+            <div className="cf-card">
+              <h3 style={{
+                fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.6rem',
+                color: 'var(--cf-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em',
+              }}>
+                <i className="bi bi-geo-alt-fill me-1" style={{ color: 'var(--cf-primary)' }} />
+                Location
+              </h3>
+
+              {issue.location.address && (
+                <p style={{ margin: '0 0 0.5rem', fontSize: '0.82rem', color: 'var(--cf-text)', lineHeight: 1.5, wordBreak: 'break-word' }}>
+                  {issue.location.address}
+                </p>
+              )}
+
+              {/* Directions link — /dir/ opens routing mode, not just a pin */}
+              <a
+                href={`https://www.google.com/maps/dir/?api=1&destination=${issue.location.latitude},${issue.location.longitude}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display:    'inline-flex',
+                  alignItems: 'center',
+                  gap:        '0.35rem',
+                  padding:    '0.45rem 0.9rem',
+                  background: 'var(--cf-primary)',
+                  color:      '#fff',
+                  borderRadius: 'var(--cf-radius-md)',
+                  fontSize:   '0.82rem',
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  transition: 'opacity 150ms',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.88'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+              >
+                <i className="bi bi-signpost-split-fill" /> Get Directions
+              </a>
+
+              <p style={{ margin: '0.4rem 0 0', fontSize: '0.7rem', color: 'var(--cf-text-muted)' }}>
+                <i className="bi bi-box-arrow-up-right me-1" />Opens Google Maps in a new tab
+              </p>
+            </div>
+          )}
+
           {/* Meta */}
           <div className="cf-card" style={{ fontSize: '0.8125rem' }}>
             <h3 style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.75rem', color: 'var(--cf-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Details</h3>
