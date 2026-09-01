@@ -66,7 +66,15 @@ const EMERGENCY_TYPES = [
 const VIDEO_MAX_SECONDS   = 15;
 const MAX_MEDIA_FILES     = 5;
 const VIDEO_CONSTRAINTS   = {
-  video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
+  video: {
+    width:      { ideal: 1280 },
+    height:     { ideal: 720 },
+    frameRate:  { ideal: 30 },
+    // Explicitly request the rear/environment camera.
+    // Without this, mobile browsers (especially iOS Safari) default to the
+    // front/selfie camera, which is wrong for capturing evidence.
+    facingMode: { ideal: 'environment' },
+  },
   audio: true,
 };
 const VIDEO_BITS_PER_SECOND = 2_000_000; // 2 Mbps
@@ -299,8 +307,17 @@ export default function ReportEmergency() {
       return;
     }
 
+    // ── ondataavailable: accumulate encoded chunks ─────────────────────────
+    // Each chunk is appended to chunksRef so the final Blob can be assembled
+    // in onstop.  The interval of 200 ms matches recorder.start(200).
     recorder.ondataavailable = (e) => {
       if (e.data?.size > 0) chunksRef.current.push(e.data);
+    };
+
+    // ── onstop: assemble the Blob and add to the media list ───────────────
+    // IMPORTANT: this must be a separate assignment on `recorder`, NOT nested
+    // inside ondataavailable — nesting it would make it dead code that is
+    // never registered as a handler on the MediaRecorder instance.
     recorder.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: mimeType || 'video/webm' });
       const ext  = mimeType.includes('mp4') ? 'mp4' : 'webm';
@@ -323,7 +340,11 @@ export default function ReportEmergency() {
       });
     }, 1000);
 
-    // Auto-stop at exactly VIDEO_MAX_SECONDS (server-side backstop also enforces this)
+    // Auto-stop at exactly VIDEO_MAX_SECONDS.
+    // Clear any previous timer first — if the user somehow triggers start/stop
+    // in rapid succession, stacking multiple timers would cause a second
+    // unwanted stop() call on an already-inactive recorder.
+    clearTimeout(stopTimerRef.current);
     stopTimerRef.current = setTimeout(() => stopRecording(), VIDEO_MAX_SECONDS * 1000);
   };
 
