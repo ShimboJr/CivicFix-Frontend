@@ -189,6 +189,13 @@ export default function ReportEmergency() {
   const countdownTimerRef = useRef(null);
   const stopTimerRef      = useRef(null);
   const livePreviewRef    = useRef(null);
+  // Holds the live MediaStream so it can be bound to the <video> element
+  // inside a useEffect that runs AFTER the element mounts (i.e. after
+  // recording flips to true and React inserts the conditional <video> into
+  // the DOM).  A plain state variable is not used here because writing state
+  // in the middle of startRecording would schedule an async re-render and
+  // still not guarantee the ref is populated before the assignment runs.
+  const activeStreamRef   = useRef(null);
   const photoRef          = useRef();
   const galleryRef        = useRef();
 
@@ -276,6 +283,36 @@ export default function ReportEmergency() {
     e.target.value = '';
   };
 
+  // ── Bind stream to <video> once the recording overlay mounts ─────────────
+  //
+  // ROOT CAUSE OF THE BLACK-BOX BUG (Candidate 3 — null-ref timing):
+  //
+  // The live-preview <video> element is conditionally rendered: it only exists
+  // in the DOM when `recording === true`.  In the previous code, the stream was
+  // assigned to livePreviewRef.current BEFORE setRecording(true) was called —
+  // so at the moment of assignment, recording was still false, the <video> was
+  // not in the DOM, and livePreviewRef.current was null.  The null-guard
+  //   if (livePreviewRef.current) { ... }
+  // silently skipped the assignment every time, leaving srcObject unset and
+  // the video permanently black.
+  //
+  // Fix: store the stream in activeStreamRef (a stable ref, not state), then
+  // let this effect run after React has committed the <video> to the DOM
+  // (i.e. after recording flips to true).  By that point livePreviewRef.current
+  // is guaranteed to be the real <video> element.
+  useEffect(() => {
+    if (!recording) return;
+    const video  = livePreviewRef.current;
+    const stream = activeStreamRef.current;
+    if (!video || !stream) return;
+
+    video.srcObject = stream;
+    // play() returns a Promise; swallow the AbortError that fires when the
+    // element is removed from the DOM before playback begins (e.g. if the
+    // user stops recording very quickly).
+    video.play().catch(() => {});
+  }, [recording]);
+
   // ── MediaRecorder video capture ───────────────────────────────────────────
   const startRecording = async () => {
     setRecorderError('');
@@ -292,11 +329,13 @@ export default function ReportEmergency() {
       return;
     }
 
+    // Store the stream in a ref so the useEffect above can bind it to the
+    // <video> element once React has mounted it (after setRecording(true)
+    // triggers a re-render and the conditional <video> appears in the DOM).
+    activeStreamRef.current = stream;
     setCameraStream(stream);
-    if (livePreviewRef.current) {
-      livePreviewRef.current.srcObject = stream;
-      livePreviewRef.current.play().catch(() => {});
-    }
+    // Do NOT try to assign livePreviewRef.current.srcObject here — the
+    // <video> element does not exist yet at this point in the call stack.
 
     const mimeType = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4']
       .find((m) => MediaRecorder.isTypeSupported(m)) ?? '';
@@ -309,6 +348,7 @@ export default function ReportEmergency() {
       });
     } catch (err) {
       stream.getTracks().forEach((t) => t.stop());
+      activeStreamRef.current = null;
       setRecorderError('MediaRecorder is not supported in this browser: ' + err.message);
       return;
     }
@@ -330,12 +370,16 @@ export default function ReportEmergency() {
       const file = new File([blob], `emergency-video-${Date.now()}.${ext}`, { type: blob.type });
       addMediaFile(file, 'video');
       stream.getTracks().forEach((t) => t.stop());
+      activeStreamRef.current = null;
       setCameraStream(null);
       if (livePreviewRef.current) livePreviewRef.current.srcObject = null;
     };
 
     recorder.start(200);
     mediaRecorderRef.current = recorder;
+    // setRecording(true) triggers a re-render.  After React commits the DOM,
+    // the useEffect above fires and binds activeStreamRef.current to the
+    // <video> element that has now mounted.
     setRecording(true);
     setCountdown(VIDEO_MAX_SECONDS);
 
