@@ -196,8 +196,13 @@ export default function ReportEmergency() {
   // in the middle of startRecording would schedule an async re-render and
   // still not guarantee the ref is populated before the assignment runs.
   const activeStreamRef   = useRef(null);
+  // Tracks elapsed recording seconds independently of the countdown display.
+  // Used by the watchdog in the countdown interval as a second auto-stop layer.
+  const elapsedSecondsRef = useRef(0);
   const photoRef          = useRef();
   const galleryRef        = useRef();
+  // Hidden <video> element used for client-side duration check after recording.
+  const durationCheckRef  = useRef(null);
 
   // ── Detect country + fetch emergency number on mount ─────────────────────
   useEffect(() => {
@@ -222,9 +227,20 @@ export default function ReportEmergency() {
   }, []);
 
   // ── Camera stream cleanup ─────────────────────────────────────────────────
+  //
+  // ROOT CAUSE NOTE (confirmed): the previous version called stopAllTimers()
+  // inside this effect's cleanup.  When startRecording() called setCameraStream(stream),
+  // React scheduled a re-render, which triggered the cleanup of the PREVIOUS
+  // cameraStream effect run — which called stopAllTimers() and immediately cleared
+  // stopTimerRef.current.  That destroyed the 15-second auto-stop timer the moment
+  // it was set, every single time recording started.
+  //
+  // Fix: this cleanup ONLY stops the media tracks.  Timers are managed exclusively
+  // inside startRecording / stopRecording so their lifecycle is deterministic.
   useEffect(() => {
     return () => {
-      stopAllTimers();
+      // Do NOT call stopAllTimers() here — that cleared stopTimerRef right after
+      // startRecording set it (see root cause note above).
       if (cameraStream) cameraStream.getTracks().forEach((t) => t.stop());
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -364,38 +380,115 @@ export default function ReportEmergency() {
     // IMPORTANT: this must be a separate assignment on `recorder`, NOT nested
     // inside ondataavailable — nesting it would make it dead code that is
     // never registered as a handler on the MediaRecorder instance.
+    //
+    // Layer 3 (client-side duration gate): after the Blob is assembled, load it
+    // into a hidden <video> element and read its .duration.  If it somehow
+    // exceeds VIDEO_MAX_SECONDS despite both stop mechanisms above, reject it
+    // client-side with a clear error rather than letting a doomed upload begin.
+    // This is a UX fast-fail only — the real hard backstop is the server-side
+    // Cloudinary Admin API duration check already built during the 413 fix.
     recorder.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: mimeType || 'video/webm' });
       const ext  = mimeType.includes('mp4') ? 'mp4' : 'webm';
       const file = new File([blob], `emergency-video-${Date.now()}.${ext}`, { type: blob.type });
-      addMediaFile(file, 'video');
+
       stream.getTracks().forEach((t) => t.stop());
       activeStreamRef.current = null;
       setCameraStream(null);
       if (livePreviewRef.current) livePreviewRef.current.srcObject = null;
+
+      // ── Layer 3: hidden-video duration check ─────────────────────────────
+      const objectUrl = URL.createObjectURL(blob);
+      const checker   = durationCheckRef.current;
+      if (checker) {
+        checker.src = objectUrl;
+        checker.onloadedmetadata = () => {
+          URL.revokeObjectURL(objectUrl);
+          checker.src = '';
+          const dur = checker.duration;
+          if (Number.isFinite(dur) && dur > VIDEO_MAX_SECONDS + 0.5) {
+            // Duration exceeded even after both stop mechanisms — reject fast.
+            setRecorderError(
+              `Recording exceeded the ${VIDEO_MAX_SECONDS}-second limit (got ${Math.round(dur)}s). ` +
+              'Please try again — it will auto-stop at 15 seconds.'
+            );
+            // Do NOT add to mediaFiles.
+          } else {
+            addMediaFile(file, 'video');
+          }
+        };
+        checker.onerror = () => {
+          // Could not determine duration (some browsers/codecs); accept the file
+          // and let the server-side check be the backstop.
+          URL.revokeObjectURL(objectUrl);
+          checker.src = '';
+          addMediaFile(file, 'video');
+        };
+      } else {
+        // Hidden checker element not in DOM (should not happen); accept and let
+        // server verify.
+        URL.revokeObjectURL(objectUrl);
+        addMediaFile(file, 'video');
+      }
     };
 
     recorder.start(200);
     mediaRecorderRef.current = recorder;
+    elapsedSecondsRef.current = 0;  // reset elapsed counter for watchdog
     // setRecording(true) triggers a re-render.  After React commits the DOM,
     // the useEffect above fires and binds activeStreamRef.current to the
     // <video> element that has now mounted.
     setRecording(true);
     setCountdown(VIDEO_MAX_SECONDS);
 
+    // ── Layer 1: primary auto-stop (setTimeout) ───────────────────────────
+    // We call clearTimeout first so that if the user somehow starts a second
+    // recording before the first finishes, stale timers don't pile up.
+    // NOTE: this timer must be set AFTER setCameraStream() is fully done
+    // scheduling its side-effects.  setCameraStream() causes a re-render which
+    // triggers the cameraStream cleanup effect.  That cleanup used to call
+    // stopAllTimers() which cleared THIS timer immediately after it was set —
+    // that was the confirmed root cause of the auto-stop never firing.
+    // The cameraStream cleanup no longer calls stopAllTimers() (see above).
+    clearTimeout(stopTimerRef.current);
+    stopTimerRef.current = setTimeout(() => {
+      const rec = mediaRecorderRef.current;
+      if (rec && rec.state !== 'inactive') {
+        rec.stop();
+      }
+      setRecording(false);
+      setCountdown(VIDEO_MAX_SECONDS);
+      clearInterval(countdownTimerRef.current);
+    }, VIDEO_MAX_SECONDS * 1000);
+
+    // ── Layer 2: watchdog inside the countdown interval ────────────────────
+    // On every 1-second tick, increment elapsedSecondsRef.  If elapsed time
+    // has reached VIDEO_MAX_SECONDS AND the recorder is still active (meaning
+    // Layer 1 somehow did not fire), forcibly call .stop() from here too.
+    // Guards against double-stop via readyState check.
     countdownTimerRef.current = setInterval(() => {
+      elapsedSecondsRef.current += 1;
+      const elapsed = elapsedSecondsRef.current;
+
+      // Watchdog: independent second enforcement at 15 s
+      if (elapsed >= VIDEO_MAX_SECONDS) {
+        const rec = mediaRecorderRef.current;
+        if (rec && rec.state !== 'inactive') {
+          // Layer 1 didn't fire (or fired concurrently) — stop from here.
+          rec.stop();
+        }
+        clearInterval(countdownTimerRef.current);
+        clearTimeout(stopTimerRef.current);
+        setRecording(false);
+        setCountdown(VIDEO_MAX_SECONDS);
+        return;
+      }
+
       setCountdown((prev) => {
         if (prev <= 1) { clearInterval(countdownTimerRef.current); return 0; }
         return prev - 1;
       });
     }, 1000);
-
-    // Auto-stop at exactly VIDEO_MAX_SECONDS.
-    // Clear any previous timer first — if the user somehow triggers start/stop
-    // in rapid succession, stacking multiple timers would cause a second
-    // unwanted stop() call on an already-inactive recorder.
-    clearTimeout(stopTimerRef.current);
-    stopTimerRef.current = setTimeout(() => stopRecording(), VIDEO_MAX_SECONDS * 1000);
   };
 
   const stopRecording = useCallback(() => {
@@ -887,6 +980,19 @@ export default function ReportEmergency() {
           {/* Hidden file inputs */}
           <input ref={photoRef} type="file" accept="image/jpeg,image/png,image/webp" capture="environment" style={{ display: 'none' }} onChange={handlePhotoCapture} />
           <input ref={galleryRef} type="file" accept="video/mp4,video/webm,video/quicktime" style={{ display: 'none' }} onChange={handleGalleryPick} />
+
+          {/* Hidden video element for Layer 3 duration check (see onstop handler).
+              Must NOT use display:none — the browser won't load metadata for hidden
+              media.  position:absolute + zero size keeps it invisible but parseable. */}
+          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+          <video
+            ref={durationCheckRef}
+            muted
+            playsInline
+            preload="metadata"
+            aria-hidden="true"
+            style={{ position: 'absolute', width: 0, height: 0, opacity: 0, pointerEvents: 'none' }}
+          />
 
           {/* Actions */}
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
