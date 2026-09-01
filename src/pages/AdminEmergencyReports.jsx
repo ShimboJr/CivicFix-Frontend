@@ -62,6 +62,177 @@ function formatAge(dateStr) {
   return r ? `${h}h ${r}m ago` : `${h}h ago`;
 }
 
+// ── Subcomponent: operational stats strip ────────────────────────────────────
+// Deliberately plain and factual — this is a monitoring readout, not an
+// analytics dashboard. No chart colors, no animations (except the stale-count
+// warning accent which should catch the admin's eye for operational reasons).
+function StatsStrip({ stats, loading }) {
+  if (loading && !stats) {
+    return (
+      <div style={{
+        display:       'flex',
+        alignItems:    'center',
+        gap:           '0.5rem',
+        padding:       '0.65rem 1rem',
+        background:    'var(--cf-surface)',
+        border:        '1px solid var(--cf-border-light)',
+        borderRadius:  'var(--cf-radius-md)',
+        marginBottom:  '1.25rem',
+        color:         'var(--cf-text-muted)',
+        fontSize:      '0.82rem',
+      }}>
+        <span className="spinner-border spinner-border-sm" style={{ width: 13, height: 13, borderWidth: 2 }} />
+        Loading stats…
+      </div>
+    );
+  }
+  if (!stats) return null;
+
+  const { avgAckMinutes, staleNewCount, byType } = stats;
+  const isStale = staleNewCount > 0;
+
+  // Card shared style
+  const cardBase = {
+    flex:          '1 1 160px',
+    padding:       '0.75rem 1rem',
+    borderRadius:  'var(--cf-radius-md)',
+    background:    'var(--cf-surface)',
+    border:        '1px solid var(--cf-border-light)',
+    minWidth:      0,
+  };
+
+  return (
+    <div
+      style={{
+        display:       'flex',
+        gap:           '0.75rem',
+        flexWrap:      'wrap',
+        marginBottom:  '1.25rem',
+      }}
+      aria-label="Emergency reports operational stats"
+    >
+      {/* Card 1 — avg acknowledgment time */}
+      <div style={cardBase}>
+        <p style={{
+          margin:      '0 0 0.25rem',
+          fontSize:    '0.68rem',
+          fontWeight:  700,
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+          color:       'var(--cf-text-secondary)',
+        }}>
+          <i className="bi bi-clock-history me-1" />
+          Avg. Ack. Time
+        </p>
+        <p style={{
+          margin:    0,
+          fontSize:  '1.45rem',
+          fontWeight: 800,
+          lineHeight: 1.1,
+          color:     'var(--cf-text)',
+          fontVariantNumeric: 'tabular-nums',
+        }}>
+          {avgAckMinutes === null ? '—' : `${avgAckMinutes}`}
+          {avgAckMinutes !== null && (
+            <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--cf-text-muted)', marginLeft: '0.3rem' }}>min</span>
+          )}
+        </p>
+        <p style={{ margin: '0.15rem 0 0', fontSize: '0.7rem', color: 'var(--cf-text-muted)' }}>
+          {avgAckMinutes === null ? 'No acknowledged reports yet' : 'across all acknowledged reports'}
+        </p>
+      </div>
+
+      {/* Card 2 — stale unacknowledged count (warning accent when > 0) */}
+      <div style={{
+        ...cardBase,
+        background: isStale ? '#fff5f5'                    : 'var(--cf-surface)',
+        border:     isStale ? '1.5px solid #fca5a5'        : '1px solid var(--cf-border-light)',
+      }}>
+        <p style={{
+          margin:      '0 0 0.25rem',
+          fontSize:    '0.68rem',
+          fontWeight:  700,
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+          color:       isStale ? '#b91c1c' : 'var(--cf-text-secondary)',
+        }}>
+          <i className={`bi ${isStale ? 'bi-exclamation-triangle-fill' : 'bi-hourglass-split'} me-1`} />
+          Stale &amp; Unacked (&gt;{STALE_MINUTES} min)
+        </p>
+        <p style={{
+          margin:     0,
+          fontSize:   '1.45rem',
+          fontWeight: 800,
+          lineHeight: 1.1,
+          color:      isStale ? '#b91c1c' : 'var(--cf-text)',
+          fontVariantNumeric: 'tabular-nums',
+        }}>
+          {staleNewCount}
+        </p>
+        <p style={{ margin: '0.15rem 0 0', fontSize: '0.7rem', color: isStale ? '#dc2626' : 'var(--cf-text-muted)' }}>
+          {isStale ? 'Needs attention' : 'All within threshold'}
+        </p>
+      </div>
+
+      {/* Card 3 — type breakdown */}
+      <div style={{ ...cardBase, flex: '2 1 260px' }}>
+        <p style={{
+          margin:      '0 0 0.35rem',
+          fontSize:    '0.68rem',
+          fontWeight:  700,
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+          color:       'var(--cf-text-secondary)',
+        }}>
+          <i className="bi bi-bar-chart-steps me-1" />
+          By Type (all time)
+        </p>
+        {byType.length === 0 ? (
+          <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--cf-text-muted)' }}>No reports yet</p>
+        ) : (
+          <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+            {byType.slice(0, 6).map(({ type, count }) => (
+              <li
+                key={type}
+                style={{
+                  display:    'flex',
+                  alignItems: 'center',
+                  gap:        '0.5rem',
+                  fontSize:   '0.78rem',
+                }}
+              >
+                <span style={{
+                  minWidth:   22,
+                  textAlign:  'right',
+                  fontWeight: 700,
+                  color:      'var(--cf-text)',
+                  fontVariantNumeric: 'tabular-nums',
+                  flexShrink: 0,
+                }}>
+                  {count}
+                </span>
+                <span style={{
+                  color:        'var(--cf-text-secondary)',
+                  overflow:     'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace:   'nowrap',
+                }}>
+                  {type}
+                </span>
+              </li>
+            ))}
+            {byType.length > 6 && (
+              <li style={{ fontSize: '0.68rem', color: 'var(--cf-text-muted)', marginTop: '0.1rem' }}>
+                +{byType.length - 6} more type{byType.length - 6 !== 1 ? 's' : ''}
+              </li>
+            )}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Subcomponent: media attachment (image or video) ───────────────────────────
 function MediaAttachment({ item, idx }) {
   const [expanded, setExpanded] = useState(false);
@@ -454,14 +625,31 @@ function OtherReportRow({ report, onStatusChange, actionLoading }) {
 
 // ── Main page component ───────────────────────────────────────────────────────
 export default function AdminEmergencyReports() {
-  const [reports,      setReports]      = useState([]);
-  const [loading,      setLoading]      = useState(true);
-  const [error,        setError]        = useState('');
+  const [reports,       setReports]       = useState([]);
+  const [loading,       setLoading]       = useState(true);
+  const [error,         setError]         = useState('');
   const [actionLoading, setActionLoading] = useState(null); // report._id being mutated
-  const [actionError,  setActionError]  = useState('');     // per-action error message
+  const [actionError,   setActionError]   = useState('');   // per-action error message
+
+  // ── Stats state — fetched independently so the strip loads even if the
+  // report list is slow, and refreshes in sync with the report auto-refresh.
+  const [stats,        setStats]        = useState(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
   const refreshTimer = useRef(null);
 
   // ── Data fetching ──────────────────────────────────────────────────────────
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await api.get('/emergency-reports/stats');
+      setStats(res.data);
+    } catch {
+      // Non-fatal: silently skip stats on error; the report list still shows
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
+
   const fetchReports = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     setError('');
@@ -476,12 +664,17 @@ export default function AdminEmergencyReports() {
   }, []);
 
   useEffect(() => {
+    // Fire both fetches in parallel on mount
     fetchReports();
+    fetchStats();
 
-    // Auto-refresh every 60 s so new reports appear without a manual reload
-    refreshTimer.current = setInterval(() => fetchReports(true), REFRESH_MS);
+    // Auto-refresh every 60 s — re-runs both so the stats strip stays in sync
+    refreshTimer.current = setInterval(() => {
+      fetchReports(true);
+      fetchStats();
+    }, REFRESH_MS);
     return () => clearInterval(refreshTimer.current);
-  }, [fetchReports]);
+  }, [fetchReports, fetchStats]);
 
   // Inject pulse-border animation once
   useEffect(() => {
@@ -499,7 +692,7 @@ export default function AdminEmergencyReports() {
     }
   }, []);
 
-  // ── Actions ────────────────────────────────────────────────────────────────
+  // ── Actions ────────────────────────────────────────────────────────────
   const handleAcknowledge = async (id) => {
     setActionError('');
     setActionLoading(id);
@@ -509,6 +702,8 @@ export default function AdminEmergencyReports() {
       // { message, report } (idempotent path — report was already acknowledged).
       const updated = res.data?.report ?? res.data;
       setReports((prev) => prev.map((r) => r._id === id ? updated : r));
+      // Refresh stats so avg ack time and stale count update immediately
+      fetchStats();
     } catch (err) {
       setActionError(`Could not acknowledge report: ${err.message}`);
     } finally {
@@ -522,6 +717,8 @@ export default function AdminEmergencyReports() {
     try {
       const res = await api.put(`/emergency-reports/${id}/status`, { status });
       setReports((prev) => prev.map((r) => r._id === id ? res.data : r));
+      // Refresh stats after any status change
+      fetchStats();
     } catch (err) {
       setActionError(`Could not update status: ${err.message}`);
     } finally {
@@ -538,11 +735,14 @@ export default function AdminEmergencyReports() {
 
   const staleCount = newReports.filter((r) => minutesAgo(r.createdAt) >= STALE_MINUTES).length;
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <DashboardLayout title="Emergency Reports">
 
-      {/* ── Page header ───────────────────────────────────────────────────── */}
+      {/* ── Operational stats strip ───────────────────────────────────── */}
+      <StatsStrip stats={stats} loading={statsLoading} />
+
+      {/* ── Page header ───────────────────────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
 
         {/* Unacknowledged badge */}
