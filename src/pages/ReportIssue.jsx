@@ -29,9 +29,10 @@ export default function ReportIssue() {
   const [errors,    setErrors]    = useState({});
   const [images,    setImages]    = useState([]);     // File objects
   const [previews,  setPreviews]  = useState([]);     // Data URLs
-  const [submitting, setSubmitting] = useState(false);
-  const [apiError,   setApiError]   = useState('');
-  const [success,    setSuccess]    = useState(null); // { issueId, id }
+  const [submitting,    setSubmitting]   = useState(false);
+  const [uploadStatus,  setUploadStatus]  = useState('');   // descriptive label during upload
+  const [apiError,      setApiError]     = useState('');
+  const [success,       setSuccess]      = useState(null); // { issueId, id }
   const fileRef = useRef();
 
   // ── Nearby duplicate detection state ──────────────────────────────────────
@@ -130,33 +131,89 @@ export default function ReportIssue() {
   };
 
   // ── Submit ────────────────────────────────────────────────────────────────
+  //
+  // Three-phase flow (mirrors the emergency-report upload pattern):
+  //   Phase 1: Fetch a server-signed payload from GET /api/uploads/signature
+  //   Phase 2: POST each image directly to Cloudinary — bytes never touch
+  //            the serverless function, so a 413 is impossible regardless
+  //            of photo resolution or file size
+  //   Phase 3: Submit the report as a plain JSON POST with Cloudinary URLs
+  //
+  // A report with no photos skips phases 1+2 and goes straight to phase 3.
   const handleSubmit = async (e) => {
     e.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
 
-    const fd = new FormData();
-    fd.append('title',       form.title.trim());
-    fd.append('description', form.description.trim());
-    fd.append('category',    form.category);
-    fd.append('severity',    form.severity);
-    fd.append('location',    JSON.stringify({
-      address:   form.address,
-      latitude:  form.latitude,
-      longitude: form.longitude,
-    }));
-    images.forEach((img) => fd.append('images', img));
-
     setSubmitting(true);
+    setUploadStatus('');
+    setApiError('');
+
     try {
-      const { data } = await api.post('/issues', fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      let imageUrls = [];
+
+      if (images.length > 0) {
+        // Phase 1: Fetch signed upload credentials ─────────────────────────
+        setUploadStatus('Preparing upload...');
+        const { data: sig } = await api.get('/uploads/signature', {
+          params: { folder: 'civicfix/issues' },
+        });
+        const { signature, timestamp, apiKey, cloudName, folder } = sig;
+
+        // Phase 2: Upload each image directly to Cloudinary ────────────────
+        // The same signature covers all files in this submission.
+        for (let i = 0; i < images.length; i++) {
+          setUploadStatus(`Uploading photo ${i + 1} of ${images.length}...`);
+
+          const fd = new FormData();
+          fd.append('file',      images[i]);
+          fd.append('api_key',   apiKey);
+          fd.append('timestamp', timestamp);
+          fd.append('signature', signature);
+          fd.append('folder',    folder);
+
+          // POST directly to Cloudinary (not our backend) so file bytes
+          // never reach the serverless function and cannot trigger a 413.
+          const uploadRes = await fetch(
+            `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+            { method: 'POST', body: fd }
+          );
+
+          if (!uploadRes.ok) {
+            const errBody = await uploadRes.json().catch(() => ({}));
+            throw new Error(
+              errBody.error?.message ||
+              `Photo ${i + 1} upload failed (HTTP ${uploadRes.status}) — please try again.`
+            );
+          }
+
+          const asset = await uploadRes.json();
+          imageUrls.push(asset.secure_url);
+        }
+      }
+
+      // Phase 3: Submit report as plain JSON (no file bytes) ────────────────
+      // Small JSON payload — well under Vercel's body limit.
+      setUploadStatus('Submitting report...');
+      const { data } = await api.post('/issues', {
+        title:       form.title.trim(),
+        description: form.description.trim(),
+        category:    form.category,
+        severity:    form.severity,
+        location: {
+          address:   form.address,
+          latitude:  form.latitude,
+          longitude: form.longitude,
+        },
+        images: imageUrls,
       });
+
       setSuccess({ issueId: data.issueId, id: data._id });
     } catch (err) {
-      setApiError(err.message);
+      setApiError(err.message || 'Submission failed — please try again.');
     } finally {
       setSubmitting(false);
+      setUploadStatus('');
     }
   };
 
@@ -508,7 +565,7 @@ export default function ReportIssue() {
           <div style={{ display: 'flex', gap: '0.75rem' }}>
             <button type="submit" className="cf-btn cf-btn-primary" disabled={submitting}>
               {submitting
-                ? <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Submitting…</>
+                ? <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>{uploadStatus || 'Submitting...'}</>
                 : <><i className="bi bi-send"></i> Submit Report</>}
             </button>
             <button type="button" className="cf-btn cf-btn-outline" onClick={() => navigate('/dashboard')}>

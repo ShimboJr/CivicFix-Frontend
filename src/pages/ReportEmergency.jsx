@@ -417,7 +417,9 @@ export default function ReportEmergency() {
       // We receive the signature + the public params needed for the upload POST.
       // The secret itself is NEVER sent to the client.
       setUploadStatus('Preparing upload…');
-      const { data: sig } = await api.get('/emergency-reports/upload-signature');
+      const { data: sig } = await api.get('/uploads/signature', {
+        params: { folder: 'civicfix/emergency-reports' },
+      });
       const { signature, timestamp, apiKey, cloudName, folder } = sig;
 
       // ── Phase 2: POST each file directly to Cloudinary ────────────────────
