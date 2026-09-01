@@ -35,6 +35,7 @@
  */
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../services/api';
 import DashboardLayout from '../components/DashboardLayout';
 
@@ -306,6 +307,30 @@ function NewReportCard({ report, onAcknowledge, onStatusChange, actionLoading })
           <option value="Resolved">Resolved</option>
           <option value="False Alarm">False Alarm</option>
         </select>
+
+        {/* View Details — always visible regardless of status */}
+        <Link
+          to={`/admin/emergency-reports/${report._id}`}
+          style={{
+            marginLeft:   'auto',
+            display:      'inline-flex',
+            alignItems:   'center',
+            gap:          '0.35rem',
+            padding:      '0.5rem 0.95rem',
+            border:       '1.5px solid var(--cf-border)',
+            borderRadius: 'var(--cf-radius-md)',
+            background:   'var(--cf-surface)',
+            color:        'var(--cf-text-secondary)',
+            fontSize:     '0.82rem',
+            fontWeight:   600,
+            textDecoration: 'none',
+            transition:   'border-color 150ms, color 150ms',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#b91c1c'; e.currentTarget.style.color = '#b91c1c'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--cf-border)'; e.currentTarget.style.color = 'var(--cf-text-secondary)'; }}
+        >
+          <i className="bi bi-eye" /> View Details
+        </Link>
       </div>
     </div>
   );
@@ -397,6 +422,32 @@ function OtherReportRow({ report, onStatusChange, actionLoading }) {
         <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"
           style={{ width: 14, height: 14, borderWidth: 2, flexShrink: 0 }} />
       )}
+
+      {/* View Details — always visible regardless of status */}
+      <Link
+        to={`/admin/emergency-reports/${report._id}`}
+        style={{
+          marginLeft:     'auto',
+          display:        'inline-flex',
+          alignItems:     'center',
+          gap:            '0.3rem',
+          padding:        '0.28rem 0.7rem',
+          border:         '1px solid var(--cf-border)',
+          borderRadius:   6,
+          background:     'var(--cf-surface)',
+          color:          'var(--cf-text-secondary)',
+          fontSize:       '0.75rem',
+          fontWeight:     600,
+          textDecoration: 'none',
+          flexShrink:     0,
+          transition:     'border-color 150ms, color 150ms',
+          whiteSpace:     'nowrap',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#b91c1c'; e.currentTarget.style.color = '#b91c1c'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--cf-border)'; e.currentTarget.style.color = 'var(--cf-text-secondary)'; }}
+      >
+        <i className="bi bi-eye" /> View Details
+      </Link>
     </div>
   );
 }

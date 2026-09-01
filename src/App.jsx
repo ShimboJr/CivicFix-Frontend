@@ -26,6 +26,7 @@ import ManageUsers             from './pages/ManageUsers';
 import ManageCategories        from './pages/ManageCategories';
 import Analytics               from './pages/Analytics';
 import AdminEmergencyReports   from './pages/AdminEmergencyReports';
+import EmergencyDetail         from './pages/EmergencyDetail';
 
 // Staff pages
 import StaffDashboard    from './pages/StaffDashboard';
@@ -66,7 +67,8 @@ export default function App() {
           <Route path="/admin/users"               element={<ProtectedRoute allowedRoles={['admin']}><ManageUsers /></ProtectedRoute>} />
           <Route path="/admin/categories"          element={<ProtectedRoute allowedRoles={['admin']}><ManageCategories /></ProtectedRoute>} />
           <Route path="/admin/analytics"           element={<ProtectedRoute allowedRoles={['admin']}><Analytics /></ProtectedRoute>} />
-          <Route path="/admin/emergency-reports"   element={<ProtectedRoute allowedRoles={['admin']}><AdminEmergencyReports /></ProtectedRoute>} />
+          <Route path="/admin/emergency-reports"      element={<ProtectedRoute allowedRoles={['admin']}><AdminEmergencyReports /></ProtectedRoute>} />
+          <Route path="/admin/emergency-reports/:id"  element={<ProtectedRoute allowedRoles={['admin']}><EmergencyDetail /></ProtectedRoute>} />
 
           {/* ── Staff zone ─────────────────────────────────────────────────── */}
           <Route path="/staff"              element={<ProtectedRoute allowedRoles={['staff']}><StaffDashboard /></ProtectedRoute>} />
