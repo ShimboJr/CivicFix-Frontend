@@ -347,12 +347,18 @@ export default function EmergencyDetail() {
                 }
               </div>
 
-              {/* Phone */}
+              {/* Contact phone — report-level field (E.164, set at submission) */}
               <div style={{ gridColumn: '1 / -1' }}>
-                <p style={{ margin: '0 0 0.15rem', fontSize: '0.72rem', fontWeight: 700, color: 'var(--cf-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Phone / Contact</p>
-                {report.reporter?.phone
-                  ? <a href={`tel:${report.reporter.phone}`} style={{ fontSize: '0.85rem', color: 'var(--cf-primary)', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                      <i className="bi bi-telephone" />{report.reporter.phone}
+                <p style={{ margin: '0 0 0.15rem', fontSize: '0.72rem', fontWeight: 700, color: 'var(--cf-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Contact Phone
+                </p>
+                {report.contactPhone
+                  ? <a
+                      href={`tel:${report.contactPhone}`}
+                      style={{ fontSize: '0.88rem', color: 'var(--cf-primary)', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}
+                    >
+                      <i className="bi bi-telephone-fill" style={{ color: '#dc2626' }} />
+                      {report.contactPhone}
                     </a>
                   : <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--cf-text-muted)' }}>Not provided</p>
                 }

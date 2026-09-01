@@ -45,6 +45,8 @@
 
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useNavigate }        from 'react-router-dom';
+import PhoneInput             from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
 import api                   from '../services/api';
 import DashboardLayout       from '../components/DashboardLayout';
 import LocationPicker        from '../components/LocationPicker';
@@ -157,11 +159,15 @@ export default function ReportEmergency() {
   const [numberLoading,     setNumberLoading]      = useState(true);
 
   // ── Form state ───────────────────────────────────────────────────────────
-  const [type,        setType]        = useState('');
-  const [description, setDescription] = useState('');
-  const [location,    setLocation]    = useState({ address: '', latitude: null, longitude: null });
-  const [errors,      setErrors]      = useState({});
-  const [apiError,    setApiError]    = useState('');
+  const [type,         setType]         = useState('');
+  const [description,  setDescription]  = useState('');
+  // contactPhone holds the E.164-formatted value produced by PhoneInput
+  // (e.g. "+2348012345678"), or undefined when the field is empty.
+  // Optional — not required for submission.
+  const [contactPhone, setContactPhone] = useState(undefined);
+  const [location,     setLocation]     = useState({ address: '', latitude: null, longitude: null });
+  const [errors,       setErrors]       = useState({});
+  const [apiError,     setApiError]     = useState('');
   // ── Upload progress state ───────────────────────────────────────────────
   // null = not uploading; 0–100 = upload in progress
   const [uploadProgress,  setUploadProgress]  = useState(null);
@@ -486,6 +492,9 @@ export default function ReportEmergency() {
           longitude: location.longitude,
         },
         media: uploadedAssets,
+        // Only include contactPhone when the reporter provided a number.
+        // PhoneInput sets value to undefined when the field is cleared.
+        ...(contactPhone ? { contactPhone } : {}),
         // Content-Type: application/json is the axios instance default
       });
 
@@ -548,7 +557,7 @@ export default function ReportEmergency() {
                 style={{ background: '#b91c1c', color: '#fff' }}
                 onClick={() => {
                   setSuccess(false);
-                  setType(''); setDescription('');
+                  setType(''); setDescription(''); setContactPhone(undefined);
                   setLocation({ address: '', latitude: null, longitude: null });
                   setMediaFiles([]); setErrors({}); setApiError('');
                 }}
@@ -649,6 +658,66 @@ export default function ReportEmergency() {
                 placeholder="Describe the emergency — who is involved, what is happening, any identifying details…"
               />
               {errors.description && <p className="cf-field-error">{errors.description}</p>}
+            </div>
+
+            {/* ── Contact phone (optional) ──────────────────────────────────
+                react-phone-number-input v3: the <PhoneInput> component
+                combines a country-select flag and a formatted number input
+                into a single controlled component.  `value` is an E.164
+                string or undefined; `onChange(value)` is the same.
+
+                We use `defaultCountry` to pre-select the flag based on the
+                country we already detected for the emergency-number banner —
+                one less tap for the majority of reporters.  */}
+            <div style={{ marginBottom: '0.25rem' }}>
+              <label
+                className="cf-form-label"
+                htmlFor="er-contact-phone"
+                style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <i className="bi bi-telephone" style={{ color: '#dc2626' }} />
+                Contact Phone
+                <span style={{ fontWeight: 400, fontSize: '0.78rem', color: 'var(--cf-text-muted)', marginLeft: '0.15rem' }}>
+                  (optional — so the admin can call you back)
+                </span>
+              </label>
+
+              {/* PhoneInput renders: [🇳🇬 ▾] [ +234 ____________ ]
+                  The outer wrapper needs cf-input border/radius styling;
+                  the library's own CSS handles the flag + select layout.
+                  We suppress its default border via a wrapping div override so
+                  the input fits the existing CivicFix design language.       */}
+              <div
+                style={{
+                  border:       '1.5px solid var(--cf-border)',
+                  borderRadius: 'var(--cf-radius-md)',
+                  background:   'var(--cf-surface)',
+                  padding:      '0.1rem 0.75rem',
+                  display:      'flex',
+                  alignItems:   'center',
+                  minHeight:    42,
+                }}
+              >
+                <PhoneInput
+                  id="er-contact-phone"
+                  value={contactPhone}
+                  onChange={setContactPhone}
+                  defaultCountry={detectedCountry ?? 'NG'}
+                  international
+                  countryCallingCodeEditable={false}
+                  style={{
+                    // Reset the library's border so our wrapper div provides it
+                    '--PhoneInput-color--focus': 'transparent',
+                    width: '100%',
+                  }}
+                />
+              </div>
+
+              <p style={{ margin: '0.3rem 0 0', fontSize: '0.75rem', color: 'var(--cf-text-muted)', lineHeight: 1.4 }}>
+                <i className="bi bi-info-circle me-1" />
+                This is stored securely and shared only with CivicFix administrators
+                responding to your report.
+              </p>
             </div>
           </div>
 
