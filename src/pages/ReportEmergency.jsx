@@ -473,8 +473,17 @@ export default function ReportEmergency() {
       if (checker) {
         checker.src = objectUrl;
         checker.onloadedmetadata = () => {
+          // ── One-shot guard: null BOTH handlers immediately ─────────────────
+          // Setting checker.src = '' (below) fires checker.onerror in most
+          // browsers (empty src = invalid resource).  If onerror still points
+          // at the fallback handler it will push a duplicate evidence entry.
+          // Nulling both handlers here — before touching src — makes them
+          // one-shot: whichever fires first wins; the other is already gone.
+          checker.onloadedmetadata = null;
+          checker.onerror = null;
+
           URL.revokeObjectURL(objectUrl);
-          checker.src = '';
+          checker.src = ''; // safe: onerror is already null, cascade impossible
           const dur = checker.duration;
           if (Number.isFinite(dur) && dur > VIDEO_MAX_SECONDS + 0.5) {
             // Duration exceeded even after both stop mechanisms — reject fast.
@@ -490,10 +499,17 @@ export default function ReportEmergency() {
           }
         };
         checker.onerror = () => {
+          // ── One-shot guard: null BOTH handlers immediately ─────────────────
+          // Mirrors the guard above.  If onerror fires first (codec not
+          // supported, src rejected), we still add the file and let the
+          // server-side Admin API be the duration backstop.
+          checker.onerror = null;
+          checker.onloadedmetadata = null;
+
           // Could not determine duration (some browsers/codecs); accept the file
           // and let the server-side check be the backstop.
           URL.revokeObjectURL(objectUrl);
-          checker.src = '';
+          checker.src = ''; // safe: both handlers already null
           _diag('evidence PUSHED to mediaFiles (via checker.onerror fallback)'); // Step 1 diagnostic
           addMediaFile(file, 'video');
         };
