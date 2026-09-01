@@ -105,6 +105,16 @@ export default function NotificationBell() {
         setUnreadCount((c) => Math.max(0, c - 1));
       } catch { /* ignore */ }
     }
+
+    // Priority 1: emergency-report notification — navigate directly to the
+    // EmergencyDetail page for this specific report.
+    const emergencyId = notif.emergencyReport?._id || notif.emergencyReport;
+    if (emergencyId) {
+      navigate(`/admin/emergency-reports/${emergencyId}`);
+      return;
+    }
+
+    // Priority 2: regular issue notification.
     // Guard: if the referenced issue was deleted, issue may be null.
     // Never navigate to /issue/null — go to /my-reports as a safe fallback.
     const issueId = notif.issue?._id || notif.issue;
@@ -187,10 +197,13 @@ export default function NotificationBell() {
           </div>
         ) : (
           notifications.map((notif) => {
-            // Resolve the issue id (may be populated object or raw ObjectId string).
-            // If the issue was deleted before backend cleanup ran, this may be null.
-            const issueId = notif.issue?._id || notif.issue || null;
-            const isOrphaned = !issueId;
+            // Resolve which link target this notification refers to.
+            // Priority: emergencyReport (path 4) > issue (paths 1-3).
+            // `isOrphaned` is only true when BOTH are absent — an emergency
+            // notification with no `issue` ref is NOT orphaned.
+            const emergencyId = notif.emergencyReport?._id || notif.emergencyReport || null;
+            const issueId     = notif.issue?._id            || notif.issue            || null;
+            const isOrphaned  = !emergencyId && !issueId;
 
             // Shared inner content for both the clickable and non-clickable variants
             const inner = (

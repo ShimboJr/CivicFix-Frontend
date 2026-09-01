@@ -7,7 +7,9 @@
  * Features:
  *  • Unread / All toggle filter
  *  • "Mark all as read" button
- *  • Clicking a notification marks it read and navigates to /issue/:id
+ *  • Clicking an emergency notification → /admin/emergency-reports/:id (EmergencyDetail)
+ *  • Clicking an issue notification      → /issue/:id
+ *  • Orphaned notifications (both refs absent) → non-clickable with "no longer available"
  *  • Pagination
  */
 
@@ -51,7 +53,7 @@ export default function Notifications() {
   // Reset to page 1 when filter changes
   useEffect(() => { setPage(1); }, [onlyUnread]);
 
-  // ── Mark single as read + navigate ──────────────────────────────────────
+  // ── Mark single as read + navigate ────────────────────────────────────
   const handleClick = async (notif) => {
     if (!notif.read) {
       try {
@@ -62,6 +64,15 @@ export default function Notifications() {
         setUnreadCount((c) => Math.max(0, c - 1));
       } catch { /* ignore */ }
     }
+
+    // Priority 1: emergency-report notification — link directly to EmergencyDetail.
+    const emergencyId = notif.emergencyReport?._id || notif.emergencyReport;
+    if (emergencyId) {
+      navigate(`/admin/emergency-reports/${emergencyId}`);
+      return;
+    }
+
+    // Priority 2: regular issue notification.
     // Guard: if the referenced issue was deleted, issue may be null.
     // Never navigate to /issue/null — stay on the notifications page.
     const issueId = notif.issue?._id || notif.issue;
@@ -160,10 +171,13 @@ export default function Notifications() {
             </div>
           ) : (
           notifications.map((notif, i) => {
-            // Resolve the issue id — may be a populated object, a raw ObjectId
-            // string, or null if the issue was deleted before server-side cleanup ran.
-            const issueId   = notif.issue?._id || notif.issue || null;
-            const isOrphaned = !issueId;
+            // Resolve which link target this notification refers to.
+            // Priority: emergencyReport (path 4) > issue (paths 1-3).
+            // `isOrphaned` is only true when BOTH are absent — emergency
+            // notifications with no `issue` ref are NOT orphaned.
+            const emergencyId = notif.emergencyReport?._id || notif.emergencyReport || null;
+            const issueId     = notif.issue?._id            || notif.issue            || null;
+            const isOrphaned  = !emergencyId && !issueId;
 
             const sharedStyle = {
               display: 'flex', alignItems: 'flex-start', gap: '0.75rem',
