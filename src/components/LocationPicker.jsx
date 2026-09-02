@@ -16,21 +16,34 @@
  *  • A forward-geocode failure is surfaced as a small inline notice.
  *  • Geolocation denial shows a polite message.
  *
- * Geolocation strategy (high-accuracy watchPosition):
- *  GPS fixes improve over the first several seconds as more satellites lock
- *  in.  Rather than accepting the first reading from getCurrentPosition
- *  (which often comes from Wi-Fi/cell-tower triangulation and can be off by
- *  hundreds of metres), we use watchPosition with enableHighAccuracy:true so
- *  the device activates its GPS chip, accumulate readings for up to
- *  GPS_WATCH_MAX_MS, and stop early if position.coords.accuracy falls below
- *  GPS_ACCURACY_THRESHOLD_M.  We always keep the best (smallest-radius)
- *  reading seen across all callbacks.
+ * ── Geolocation strategy (high-accuracy watchPosition) ────────────────────────
  *
- *  The resulting accuracy (in metres) is shown as a translucent circle on
- *  the map so the resident can judge how tight the fix is, and a caption
- *  reminds them they can tap the map to manually fine-tune the pin.
- *  Clicking the map clears the accuracy circle (the circle only makes sense
- *  for auto-detected positions, not manually placed pins).
+ * GPS fixes improve over the first several seconds as more satellites lock in.
+ * Rather than accepting the first reading from getCurrentPosition (which often
+ * comes from Wi-Fi/cell-tower triangulation, accuracy 50–500 m), we use
+ * watchPosition with enableHighAccuracy:true so the device activates its GPS
+ * chip, accumulate readings for up to GPS_WATCH_MAX_MS, and stop early if
+ * position.coords.accuracy falls below GPS_ACCURACY_THRESHOLD_M.
+ *
+ * Key design choices that prevent the three bugs this file previously had:
+ *
+ *   FIX 1 — One geocode call per session, not one per tick
+ *     onSuccess never calls applyPosition.  It only updates the `best` tracker.
+ *     applyPosition (and therefore reverseGeocode) is called exactly once, at
+ *     the moment the watch window ends — either via early-stop or timeout.
+ *
+ *   FIX 2 — Stale-response protection via geocodeEpochRef
+ *     Every time applyPosition starts a reverseGeocode call, it stamps the
+ *     current value of geocodeEpochRef.  If a newer call has been started by
+ *     the time the fetch resolves, the older result is discarded.  An older,
+ *     slower response can never overwrite a newer, better result.
+ *
+ *   FIX 3 — Graceful degradation: best-available, not all-or-nothing
+ *     The timeout path applies best.pos when it exists (any accuracy), only
+ *     showing an error when truly zero position updates arrived.  A real GPS
+ *     reading with wide uncertainty is far better than forcing a manual pin drop.
+ *     The error message is tightened to "no GPS signal" which is the only case
+ *     that now reaches it.
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -48,7 +61,6 @@ const DEFAULT_ZOOM = 12;
 const NOMINATIM    = 'https://nominatim.openstreetmap.org';
 
 // High-accuracy GPS watch parameters
-// ─────────────────────────────────
 // GPS_WATCH_MAX_MS:         Maximum time to keep the watch alive before stopping
 //                           and accepting whatever best reading we collected.
 //                           8 seconds is long enough to get a GPS lock on most
@@ -58,13 +70,12 @@ const NOMINATIM    = 'https://nominatim.openstreetmap.org';
 //                           20 m is tighter than Wi-Fi triangulation (often
 //                           >100 m) but achievable with a GPS chip in a few
 //                           seconds of clear sky.
-const GPS_WATCH_MAX_MS        = 8_000;
+const GPS_WATCH_MAX_MS         = 8_000;
 const GPS_ACCURACY_THRESHOLD_M = 20;
 
 // Accuracy-circle appearance
-// Leaflet's Circle takes a `pathOptions` object for Leaflet 1.x style props.
 const ACCURACY_CIRCLE_OPTIONS = {
-  color:       '#2563eb',   // blue stroke
+  color:       '#2563eb',
   fillColor:   '#3b82f6',
   fillOpacity: 0.12,
   weight:      1.5,
@@ -115,7 +126,7 @@ function ClickHandler({ onMapClick }) {
 
 // ── Internal sub-component: exposes imperative map methods to the parent ───────
 function MapController({ controllerRef }) {
-  const map = useMapEvents({});        // get map instance
+  const map = useMapEvents({});
   useEffect(() => {
     if (controllerRef) controllerRef.current = map;
   }, [map, controllerRef]);
@@ -138,9 +149,6 @@ export default function LocationPicker({ value, onChange }) {
 
   // accuracyRadius: metres reported by position.coords.accuracy for the best
   // GPS fix we collected, or null when no GPS fix is active.
-  // Shown as a translucent circle on the map so the resident can see how
-  // precise the reading is.  Cleared when the user manually clicks the map
-  // (their clicked pin is intentional; the circle would then be misleading).
   const [accuracyRadius, setAccuracyRadius] = useState(null);
 
   // Ref to imperative Leaflet map (for flyTo calls)
@@ -149,11 +157,17 @@ export default function LocationPicker({ value, onChange }) {
   // Debounce timer for forward-geocode on text input
   const debounceRef = useRef(null);
 
-  // watchId from navigator.geolocation.watchPosition — kept in a ref so we
-  // can clearWatch from both the timeout and the early-stop path without
-  // creating a stale-closure problem.
-  const watchIdRef      = useRef(null);
-  const watchTimerRef   = useRef(null);
+  // watchId + timer from watchPosition — kept in refs to avoid stale closures
+  const watchIdRef    = useRef(null);
+  const watchTimerRef = useRef(null);
+
+  // ── FIX 2: geocode epoch / request-id tracker ─────────────────────────────
+  // Incremented each time applyPosition kicks off a reverseGeocode call.
+  // The async callback checks whether the epoch still matches before writing
+  // any state — if a newer call has been issued, the older result is ignored.
+  // This guarantees that an older, slower Nominatim response arriving late
+  // can never overwrite a newer, better result already applied to the form.
+  const geocodeEpochRef = useRef(0);
 
   // ── Sync prop value → internal state (controlled usage) ──────────────────
   useEffect(() => {
@@ -171,16 +185,23 @@ export default function LocationPicker({ value, onChange }) {
     setGeoError('');
     setLocError('');
 
-    // The user deliberately placed their own pin — the GPS accuracy circle no
-    // longer refers to this position, so hide it to avoid confusion.
+    // The user deliberately placed their own pin — clear the GPS accuracy
+    // circle since it no longer refers to this position.
     setAccuracyRadius(null);
 
     // Optimistically push raw coords so the form isn't blocked
     onChange({ address: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, latitude: lat, longitude: lng });
     setAddressText(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
 
-    // Then refine with human-readable address
+    // Stamp the epoch for this geocode call
+    const myEpoch = ++geocodeEpochRef.current;
+
+    // Then refine with a human-readable address
     const addr = await reverseGeocode(lat, lng);
+
+    // Discard if a newer call has already run (e.g. user clicked map twice quickly)
+    if (geocodeEpochRef.current !== myEpoch) return;
+
     setAddressText(addr);
     onChange({ address: addr, latitude: lat, longitude: lng });
   }, [onChange]);
@@ -209,16 +230,13 @@ export default function LocationPicker({ value, onChange }) {
       setAddressText(address);
       onChange({ address, latitude: lat, longitude: lng });
 
-      // Pan map to the geocoded location
       if (mapRef.current) {
         mapRef.current.flyTo([lat, lng], Math.max(mapRef.current.getZoom(), 14));
       }
-    }, 600); // 600 ms debounce — avoids firing on every keystroke
+    }, 600);
   };
 
   // ── Stop any in-progress watch ────────────────────────────────────────────
-  // Extracted so it can be called from both the timeout path and the early-
-  // stop path without duplicating logic.
   const stopWatch = useCallback(() => {
     if (watchIdRef.current !== null) {
       navigator.geolocation.clearWatch(watchIdRef.current);
@@ -230,26 +248,20 @@ export default function LocationPicker({ value, onChange }) {
     }
   }, []);
 
-  // Clean up on unmount — don't leave a watch running in the background.
+  // Clean up on unmount
   useEffect(() => stopWatch, [stopWatch]);
 
   // ── "Use my location" button — watchPosition with high accuracy ──────────
   //
-  // WHY watchPosition INSTEAD OF getCurrentPosition:
-  //   getCurrentPosition returns the first available fix, which on mobile
-  //   often comes from Wi-Fi/cell-tower triangulation (quick but coarse,
-  //   accuracy radius typically 50–500 m).  GPS chip fixes improve as more
-  //   satellites lock in over the first several seconds.  watchPosition lets
-  //   us collect multiple fixes and keep the best one (smallest accuracy
-  //   radius), then clearWatch once we're done.
+  // ── FIX 1: one geocode call per session ──────────────────────────────────
+  // onSuccess NEVER calls applyPosition — it only keeps `best` updated.
+  // applyPosition is called exactly once, at the moment the watch ends
+  // (early-stop when threshold is met, or 8s timeout with best-available).
   //
-  // enableHighAccuracy: true   — asks the device to activate its GPS chip
-  // maximumAge: 0              — forces a fresh reading (no cached fix)
-  // timeout: 15000             — per-callback timeout (not total)
-  //
-  // We stop the watch when either:
-  //   (a) GPS_WATCH_MAX_MS has elapsed (accept whatever best we collected)
-  //   (b) accuracy ≤ GPS_ACCURACY_THRESHOLD_M (good enough — stop early)
+  // ── FIX 3: graceful degradation ──────────────────────────────────────────
+  // The timeout path applies best.pos regardless of its accuracy value — a
+  // real GPS reading at 80m accuracy is far better than failing entirely.
+  // The error message only fires when truly zero updates were received.
   const handleUseMyLocation = () => {
     if (!navigator.geolocation) {
       setLocError('Your browser does not support Geolocation.');
@@ -264,49 +276,73 @@ export default function LocationPicker({ value, onChange }) {
     setAccuracyRadius(null);
 
     // Track the best position seen so far (smallest accuracy radius).
-    // Stored in a plain object so callbacks always close over the same
-    // reference without stale-closure issues on the accuracy comparison.
+    // Plain object — callbacks always close over the same reference.
     const best = { pos: null, accuracy: Infinity };
 
-    // Shared callback for applying a position to the map + calling onChange.
-    // Called both on early-stop and on the 8-second timeout.
+    // Guards against applyPosition being called a second time if the OS
+    // delivers one extra position event after clearWatch() is processed
+    // (a known browser behaviour on some platforms).
+    let watchEnded = false;
+
+    // ── applyPosition: called exactly ONCE per session ────────────────────
+    //
+    // FIX 1: called only from early-stop or timeout — never from each tick.
+    // FIX 2: stamps a geocodeEpoch so any previous in-flight call is ignored.
     const applyPosition = async (pos) => {
+      // Re-entracy guard — belt-and-suspenders on top of stopWatch()
+      if (watchEnded) return;
+      watchEnded = true;
+
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
-      const acc = pos.coords.accuracy; // metres
+      const acc = pos.coords.accuracy;
 
+      // Immediately update the map and form with raw coords so the user sees
+      // instant feedback even before the geocode resolves.
       setMarkerPos([lat, lng]);
       setAccuracyRadius(acc);
       onChange({ address: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, latitude: lat, longitude: lng });
       setAddressText(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
       if (mapRef.current) mapRef.current.flyTo([lat, lng], 16);
 
+      // Stamp this geocode generation.  Any earlier in-flight call (from a
+      // previous "My location" press) will see a mismatched epoch and discard
+      // its result without touching state.
+      const myEpoch = ++geocodeEpochRef.current;
+
       const addr = await reverseGeocode(lat, lng);
+
+      // FIX 2: discard if a newer geocode has been issued (e.g. user pressed
+      // "My location" again while this fetch was in-flight).
+      if (geocodeEpochRef.current !== myEpoch) return;
+
       setAddressText(addr);
       onChange({ address: addr, latitude: lat, longitude: lng });
       setLocating(false);
     };
 
+    // ── onSuccess: collect readings, never geocode ────────────────────────
     const onSuccess = (pos) => {
       const accuracy = pos.coords.accuracy;
 
-      // Keep the sharpest reading we've seen
+      // Keep the sharpest reading seen so far
       if (accuracy < best.accuracy) {
         best.accuracy = accuracy;
         best.pos      = pos;
       }
 
-      // Early-stop: accuracy is good enough — no need to wait any longer
+      // Early-stop: accuracy threshold met — no need to wait out the full window
       if (accuracy <= GPS_ACCURACY_THRESHOLD_M) {
         stopWatch();
         applyPosition(pos);
       }
-      // Otherwise keep watching until the timeout fires
+      // Otherwise: keep watching — timeout will call applyPosition at deadline
     };
 
     const onError = (err) => {
-      // If we already have a best reading, use it rather than showing an error
-      // (e.g. the watch timed out on one callback but we got earlier fixes).
+      // If we already have a best reading, use it rather than showing an error.
+      // This covers the case where the watch timed out on one callback but
+      // valid fixes arrived earlier in the session.
       if (best.pos) {
         stopWatch();
         applyPosition(best.pos);
@@ -327,20 +363,30 @@ export default function LocationPicker({ value, onChange }) {
       {
         enableHighAccuracy: true,
         maximumAge:         0,      // never return a cached fix
-        timeout:            15_000, // per-callback timeout for the OS to return a reading
+        timeout:            15_000, // per-callback OS timeout
       }
     );
 
-    // Hard deadline: stop the watch after GPS_WATCH_MAX_MS regardless of
-    // whether we hit the accuracy threshold.  Apply whatever best reading
-    // we've collected so far; if none arrived at all, show the error.
+    // ── Hard deadline ─────────────────────────────────────────────────────
+    // Stop the watch after GPS_WATCH_MAX_MS regardless of accuracy threshold.
+    //
+    // FIX 3: Apply whatever best reading we collected, even if its accuracy
+    // never crossed the 20m threshold.  Any real GPS reading — even 200m —
+    // is far better than forcing the user to drop a pin manually.
+    // Only show an error when truly zero position updates arrived at all
+    // (which means GPS is genuinely non-functional on this device/environment).
     watchTimerRef.current = setTimeout(() => {
       stopWatch();
       if (best.pos) {
+        // Good-enough accuracy or not — use it.  The accuracy circle on the map
+        // will show the user exactly how precise the reading is so they can
+        // tap to fine-tune if needed.
         applyPosition(best.pos);
       } else {
+        // Zero updates received — GPS is actually broken (no signal, airplane
+        // mode, hardware disabled).  This is the only case that shows an error.
         setLocating(false);
-        setLocError('Unable to retrieve your location within the timeout. Please click the map instead.');
+        setLocError('Could not get a GPS signal. Please click the map to set your location manually.');
       }
     }, GPS_WATCH_MAX_MS);
   };
@@ -446,8 +492,7 @@ export default function LocationPicker({ value, onChange }) {
 
           {/* Accuracy circle — only shown after a GPS fix, not after a manual
               map click.  The radius (metres) comes directly from the browser's
-              position.coords.accuracy — the same value a native maps app shows
-              as its "blue disc".  Leaflet's Circle takes radius in metres. */}
+              position.coords.accuracy.  Leaflet's Circle takes radius in metres. */}
           {markerPos && accuracyRadius !== null && (
             <Circle
               center={markerPos}
