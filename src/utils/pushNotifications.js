@@ -47,9 +47,18 @@ function urlBase64ToUint8Array(base64String) {
  * @throws {Error}  On permission denial, missing browser support, or API error.
  */
 export async function subscribeToPush(authToken) {
-  // ── Step 0: capability guard ──────────────────────────────────────────────
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    throw new Error('Web Push is not supported in this browser.');
+  // ── Step 0: capability guards ─────────────────────────────────────────────
+  if (!('serviceWorker' in navigator)) {
+    throw new Error(
+      'Your browser does not support service workers — push notifications unavailable.'
+    );
+  }
+  if (!('PushManager' in window)) {
+    throw new Error(
+      'Push notifications are not supported in this browser. ' +
+      'On iPhone/iPad, install CivicFix to your Home Screen first ' +
+      '(tap Share → "Add to Home Screen"), then open the app and try again.'
+    );
   }
 
   // ── Step 1: request notification permission ───────────────────────────────

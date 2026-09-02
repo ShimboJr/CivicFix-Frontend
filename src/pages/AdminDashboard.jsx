@@ -36,7 +36,7 @@ function StatCard({ label, icon, color, value }) {
 // ── PushAlertBanner ────────────────────────────────────────────────────────────
 //
 // Shown only to admin users whose browser:
-//   • Supports the Push API (PushManager in window)
+//   • Supports the Notification API
 //   • Has not yet granted notification permission for this site
 //
 // Once the admin clicks and grants permission the banner disappears for the
@@ -48,12 +48,22 @@ function PushAlertBanner({ token }) {
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    // Show only when push is supported AND permission is not yet 'granted'.
-    // 'default' = never asked; 'denied' = admin blocked it (banner can't help).
+    // Show the banner whenever the browser has the Notification API and the
+    // admin has not yet granted permission.
+    //
+    // We intentionally do NOT gate on 'PushManager' here — PushManager is
+    // absent on iOS Safari (unless the PWA is installed to the home screen),
+    // Firefox on iOS, and some Android WebViews.  Checking only for
+    // Notification means the banner appears consistently; if the device truly
+    // can't do push, subscribeToPush() will throw a clear human-readable error
+    // that appears inline in the banner rather than silently hiding it.
+    //
+    // 'denied' = admin actively blocked notifications — the banner can't help;
+    // skip it so we don't show a button that will permanently fail.
     if (
-      'PushManager' in window &&
       'Notification' in window &&
-      Notification.permission !== 'granted'
+      Notification.permission !== 'granted' &&
+      Notification.permission !== 'denied'
     ) {
       setVisible(true);
     }
