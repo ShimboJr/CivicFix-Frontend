@@ -343,12 +343,6 @@ export default function ReportEmergency() {
     video.play().catch(() => {});
   }, [recording]);
 
-  // ── Diagnostic counter (Step 1 — remove after testing) ────────────────────
-  const _diagCounterRef = useRef(0);
-  const _diag = (label) => {
-    _diagCounterRef.current += 1;
-    console.log(`[REC-DIAG #${_diagCounterRef.current}] ${label}`);
-  };
 
   // ── MediaRecorder video capture ───────────────────────────────────────────
   const startRecording = async () => {
@@ -383,7 +377,6 @@ export default function ReportEmergency() {
         ...(mimeType ? { mimeType } : {}),
         videoBitsPerSecond: VIDEO_BITS_PER_SECOND,
       });
-      _diag('MediaRecorder CREATED'); // Step 1 diagnostic
     } catch (err) {
       stream.getTracks().forEach((t) => t.stop());
       activeStreamRef.current = null;
@@ -429,13 +422,8 @@ export default function ReportEmergency() {
       // it inside onstop re-armed the guard while async callbacks (onloadedmetadata)
       // and stale interval ticks were still in flight — allowing a second
       // finalization to pass the check and add a duplicate evidence entry.
-      _diag('onstop ENTERED'); // Step 1 diagnostic
-      if (hasFinalizedRef.current) {
-        _diag('onstop BLOCKED by guard (duplicate event)'); // Step 1 diagnostic
-        return;
-      }
+      if (hasFinalizedRef.current) return;
       hasFinalizedRef.current = true;
-      _diag('onstop PROCEEDING — hasFinalizedRef now true'); // Step 1 diagnostic
 
       // 1. Kill timers — good hygiene; stops wasted cycles.
       //    Correctness no longer depends on this clearing being perfect:
@@ -487,14 +475,12 @@ export default function ReportEmergency() {
           const dur = checker.duration;
           if (Number.isFinite(dur) && dur > VIDEO_MAX_SECONDS + 0.5) {
             // Duration exceeded even after both stop mechanisms — reject fast.
-            _diag('evidence REJECTED — duration exceeded'); // Step 1 diagnostic
             setRecorderError(
               `Recording exceeded the ${VIDEO_MAX_SECONDS}-second limit (got ${Math.round(dur)}s). ` +
               'Please try again — it will auto-stop at 15 seconds.'
             );
             // Do NOT add to mediaFiles.
           } else {
-            _diag('evidence PUSHED to mediaFiles (via onloadedmetadata)'); // Step 1 diagnostic
             addMediaFile(file, 'video');
           }
         };
@@ -510,14 +496,12 @@ export default function ReportEmergency() {
           // and let the server-side check be the backstop.
           URL.revokeObjectURL(objectUrl);
           checker.src = ''; // safe: both handlers already null
-          _diag('evidence PUSHED to mediaFiles (via checker.onerror fallback)'); // Step 1 diagnostic
           addMediaFile(file, 'video');
         };
       } else {
         // Hidden checker element not in DOM (should not happen); accept and let
         // server verify.
         URL.revokeObjectURL(objectUrl);
-        _diag('evidence PUSHED to mediaFiles (no checker element)'); // Step 1 diagnostic
         addMediaFile(file, 'video');
       }
     };
@@ -528,7 +512,6 @@ export default function ReportEmergency() {
     // new recording actually starts (after getUserMedia + new MediaRecorder) —
     // and ONLY here.  It is NOT reset inside onstop anymore (see note above).
     hasFinalizedRef.current   = false; // new recording session — allow exactly one finalization
-    _diag('recorder.start() called — hasFinalizedRef reset to false'); // Step 1 diagnostic
     // setRecording(true) triggers a re-render.  After React commits the DOM,
     // the useEffect above fires and binds activeStreamRef.current to the
     // <video> element that has now mounted.
@@ -544,7 +527,6 @@ export default function ReportEmergency() {
       // Guard: if onstop already ran (or another trigger already called
       // .stop() and onstop is in-flight), do nothing.
       if (hasFinalizedRef.current) return;
-      _diag('Layer 1 setTimeout FIRING — calling rec.stop()'); // Step 1 diagnostic
       const rec = mediaRecorderRef.current;
       if (rec && rec.state !== 'inactive') {
         rec.stop(); // triggers onstop → all finalization happens there
@@ -567,7 +549,6 @@ export default function ReportEmergency() {
     // to a React effect re-run, or is never cleared for some reason, it is
     // completely harmless — it can never produce a duplicate evidence entry.
     countdownTimerRef.current = setInterval(() => {
-      _diag('interval TICK'); // Step 1 diagnostic — remove after testing
       // Purely decrement the visible countdown display.
       setCountdown((prev) => {
         if (prev <= 1) return 0; // bottom out at 0; onstop will clear this interval
@@ -582,7 +563,6 @@ export default function ReportEmergency() {
     // ALL finalization (blob, evidence, stream release, UI reset) happens in
     // onstop — never here.  hasFinalizedRef is read only, never written here.
     if (hasFinalizedRef.current) return; // onstop already ran or .stop() already called
-    _diag('Manual stopRecording CALLED — calling rec.stop()'); // Step 1 diagnostic
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop(); // triggers onstop → all finalization happens there
     }
