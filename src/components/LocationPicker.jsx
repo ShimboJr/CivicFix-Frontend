@@ -61,17 +61,22 @@ const DEFAULT_ZOOM = 12;
 const NOMINATIM    = 'https://nominatim.openstreetmap.org';
 
 // High-accuracy GPS watch parameters
-// GPS_WATCH_MAX_MS:         Maximum time to keep the watch alive before stopping
-//                           and accepting whatever best reading we collected.
-//                           8 seconds is long enough to get a GPS lock on most
-//                           modern devices in open sky; short enough not to feel
-//                           like a hang.
-// GPS_ACCURACY_THRESHOLD_M: Stop the watch early once accuracy is this good.
-//                           20 m is tighter than Wi-Fi triangulation (often
-//                           >100 m) but achievable with a GPS chip in a few
-//                           seconds of clear sky.
-const GPS_WATCH_MAX_MS         = 8_000;
-const GPS_ACCURACY_THRESHOLD_M = 20;
+//
+// GPS_WATCH_MAX_MS:
+//   Maximum time to keep the watch alive before accepting whatever we have.
+//   8 s was too short for real mobile use — GPS chips on a cold start
+//   (first use after the browser lost its last fix, or on mid-range Android)
+//   routinely take 15–30 s to acquire satellites.  20 s is long enough to
+//   cover the realistic worst case while still feeling responsive.
+//
+// GPS_ACCURACY_THRESHOLD_M:
+//   Stop the watch early once accuracy is this good.  20 m was too tight —
+//   mid-range Android phones in urban areas often plateau at 30–80 m even
+//   after a full satellite lock, so the early-stop never fired and the full
+//   20 s always elapsed.  80 m is precise enough to drop a useful pin; the
+//   accuracy circle shows the user exactly how tight the fix is.
+const GPS_WATCH_MAX_MS         = 20_000;
+const GPS_ACCURACY_THRESHOLD_M = 80;
 
 // Accuracy-circle appearance
 const ACCURACY_CIRCLE_OPTIONS = {
@@ -362,8 +367,14 @@ export default function LocationPicker({ value, onChange }) {
       onError,
       {
         enableHighAccuracy: true,
-        maximumAge:         0,      // never return a cached fix
-        timeout:            15_000, // per-callback OS timeout
+        // Allow a cached position up to 90 s old.
+        // This is the single biggest improvement for mobile: if the OS already
+        // has a recent fix (very common — the phone tracks location for other
+        // apps), the first callback fires instantly instead of waiting for a
+        // fresh satellite acquisition.  The watch continues afterwards so we
+        // can still refine to a more accurate reading within the time window.
+        maximumAge: 90_000,
+        timeout:    15_000, // per-callback OS timeout
       }
     );
 
