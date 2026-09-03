@@ -23,13 +23,13 @@ import DashboardLayout from '../components/DashboardLayout';
 import api from '../services/api';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const PING_INTERVAL_MS   = 12_000;  // send a ping every 12 s (throttle)
-const TICK_INTERVAL_MS   = 1_000;   // UI clock update
-const MAX_TOTAL_MINUTES  = 8 * 60;  // absolute cap when extending (8 hours)
-const EXTEND_OPTIONS     = [
+const PING_INTERVAL_MS = 12_000;  // send a ping every 12 s (throttle)
+const TICK_INTERVAL_MS = 1_000;   // UI clock update
+const MAX_TOTAL_MINUTES = 8 * 60;  // absolute cap when extending (8 hours)
+const EXTEND_OPTIONS = [
   { label: '+15 min', value: 15 },
-  { label: '+1 hr',  value: 60 },
-  { label: '+2 hr',  value: 120 },
+  { label: '+1 hr', value: 60 },
+  { label: '+2 hr', value: 120 },
 ];
 
 // ── Helper — format seconds as hh:mm:ss or mm:ss ─────────────────────────────
@@ -50,44 +50,44 @@ function getToken() {
 }
 
 export default function LiveLocationActive() {
-  const { id }        = useParams();
-  const navState      = useLocation().state ?? {};
-  const navigate      = useNavigate();
-  const { user }      = useAuth();
+  const { id } = useParams();
+  const navState = useLocation().state ?? {};
+  const navigate = useNavigate();
+  const { user } = useAuth();
 
   // ── Core state ─────────────────────────────────────────────────────────────
   const [sessionStatus, setSessionStatus] = useState('active');   // 'active' | 'ended' | 'expired'
-  const [expiresAt,     setExpiresAt]     = useState(
+  const [expiresAt, setExpiresAt] = useState(
     navState.expiresAt ? new Date(navState.expiresAt) : null
   );
-  const [startedAt]                       = useState(new Date());
+  const [startedAt] = useState(new Date());
 
   // Elapsed since page load (proxy for elapsed since session start)
-  const [elapsed,   setElapsed]   = useState(0);   // seconds
+  const [elapsed, setElapsed] = useState(0);   // seconds
   const [remaining, setRemaining] = useState(null); // seconds
 
   // UI state
-  const [geoError,      setGeoError]      = useState('');
-  const [pingError,     setPingError]      = useState('');
-  const [pingCount,     setPingCount]      = useState(0);
-  const [lastPingAt,    setLastPingAt]     = useState(null);
-  const [stopping,      setStopping]       = useState(false);
-  const [stopError,     setStopError]      = useState('');
-  const [showExtend,    setShowExtend]     = useState(false);
-  const [extendLoading, setExtendLoading]  = useState(false);
-  const [extendError,   setExtendError]    = useState('');
-  const [showDetails,   setShowDetails]    = useState(false);
-  const [detailsText,   setDetailsText]    = useState('');
-  const [detailsSaving, setDetailsSaving]  = useState(false);
-  const [detailsSaved,  setDetailsSaved]   = useState(false);
-  const [detailsError,  setDetailsError]   = useState('');
+  const [geoError, setGeoError] = useState('');
+  const [pingError, setPingError] = useState('');
+  const [pingCount, setPingCount] = useState(0);
+  const [lastPingAt, setLastPingAt] = useState(null);
+  const [stopping, setStopping] = useState(false);
+  const [stopError, setStopError] = useState('');
+  const [showExtend, setShowExtend] = useState(false);
+  const [extendLoading, setExtendLoading] = useState(false);
+  const [extendError, setExtendError] = useState('');
+  const [showDetails, setShowDetails] = useState(false);
+  const [detailsText, setDetailsText] = useState('');
+  const [detailsSaving, setDetailsSaving] = useState(false);
+  const [detailsSaved, setDetailsSaved] = useState(false);
+  const [detailsError, setDetailsError] = useState('');
 
   // ── Refs — used inside closures to avoid stale-state issues ───────────────
-  const activeRef       = useRef(true);   // set to false on unmount/stop/expire
-  const watchIdRef      = useRef(null);   // geolocation.watchPosition id
-  const latestPosRef    = useRef(null);   // the most recent position from watchPosition
-  const pingTimerRef    = useRef(null);   // setInterval id for throttled pings
-  const expiresAtRef    = useRef(expiresAt);
+  const activeRef = useRef(true);   // set to false on unmount/stop/expire
+  const watchIdRef = useRef(null);   // geolocation.watchPosition id
+  const latestPosRef = useRef(null);   // the most recent position from watchPosition
+  const pingTimerRef = useRef(null);   // setInterval id for throttled pings
+  const expiresAtRef = useRef(expiresAt);
 
   // Keep expiresAtRef in sync with state
   useEffect(() => { expiresAtRef.current = expiresAt; }, [expiresAt]);
@@ -100,14 +100,14 @@ export default function LiveLocationActive() {
         setSessionStatus(data.status);
         if (data.expiresAt) setExpiresAt(new Date(data.expiresAt));
       })
-      .catch(() => {/* non-fatal — UI degrades gracefully */});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+      .catch(() => {/* non-fatal — UI degrades gracefully */ });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   // ── Clock — ticks every second ────────────────────────────────────────────
   useEffect(() => {
     const tick = () => {
-      const now      = Date.now();
+      const now = Date.now();
       const elapsedS = Math.floor((now - startedAt.getTime()) / 1000);
       setElapsed(elapsedS);
 
@@ -125,7 +125,7 @@ export default function LiveLocationActive() {
     const timerId = setInterval(tick, TICK_INTERVAL_MS);
     tick(); // run immediately
     return () => clearInterval(timerId);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startedAt, sessionStatus]);
 
   // ── Ping function — sends one position reading to the server ─────────────
@@ -149,14 +149,14 @@ export default function LiveLocationActive() {
     const { latitude, longitude, accuracy } = pos.coords;
     const url = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/live-location/${id}/ping`;
     const payload = JSON.stringify({ latitude, longitude, accuracy });
-    const token   = getToken();
+    const token = getToken();
 
     // Primary path: regular fetch with auth header (gives error feedback)
     try {
       const res = await fetch(url, {
-        method:  'POST',
+        method: 'POST',
         headers: {
-          'Content-Type':  'application/json',
+          'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
         body: payload,
@@ -240,13 +240,13 @@ export default function LiveLocationActive() {
     }, PING_INTERVAL_MS);
 
     return () => teardown();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionStatus]);
 
   // ── Cleanup on unmount ────────────────────────────────────────────────────
   useEffect(() => {
     return () => teardown();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Stop sharing ──────────────────────────────────────────────────────────
@@ -275,9 +275,9 @@ export default function LiveLocationActive() {
     setExtendError('');
     setExtendLoading(true);
 
-    const cap       = new Date(startedAt.getTime() + MAX_TOTAL_MINUTES * 60_000);
-    const current   = expiresAtRef.current ?? new Date();
-    const proposed  = new Date(current.getTime() + extraMinutes * 60_000);
+    const cap = new Date(startedAt.getTime() + MAX_TOTAL_MINUTES * 60_000);
+    const current = expiresAtRef.current ?? new Date();
+    const proposed = new Date(current.getTime() + extraMinutes * 60_000);
     const newExpiry = proposed > cap ? cap : proposed;
 
     if (newExpiry <= (expiresAtRef.current ?? new Date())) {
@@ -321,13 +321,13 @@ export default function LiveLocationActive() {
   // ── Derived values ────────────────────────────────────────────────────────
   const isEnded = sessionStatus === 'ended' || sessionStatus === 'expired';
 
-  const statusColor  = sessionStatus === 'active' ? '#16a34a' : '#dc2626';
-  const statusBg     = sessionStatus === 'active' ? '#dcfce7' : '#fee2e2';
-  const statusLabel  = sessionStatus === 'active'
+  const statusColor = sessionStatus === 'active' ? '#16a34a' : '#dc2626';
+  const statusBg = sessionStatus === 'active' ? '#dcfce7' : '#fee2e2';
+  const statusLabel = sessionStatus === 'active'
     ? 'Live location sharing is active'
     : sessionStatus === 'expired'
-    ? 'Session expired'
-    : 'Sharing stopped';
+      ? 'Session expired'
+      : 'Sharing stopped';
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -339,25 +339,25 @@ export default function LiveLocationActive() {
           role="status"
           aria-live="polite"
           style={{
-            borderRadius:  14,
-            background:    statusBg,
-            border:        `2px solid ${statusColor}`,
-            padding:       '1.1rem 1.3rem',
-            marginBottom:  '1.25rem',
-            display:       'flex',
-            alignItems:    'center',
-            gap:           '0.85rem',
+            borderRadius: 14,
+            background: statusBg,
+            border: `2px solid ${statusColor}`,
+            padding: '1.1rem 1.3rem',
+            marginBottom: '1.25rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.85rem',
           }}
         >
           {/* Animated dot */}
           <div
             style={{
-              width:        14,
-              height:       14,
+              width: 14,
+              height: 14,
               borderRadius: '50%',
-              background:   statusColor,
-              flexShrink:   0,
-              boxShadow:    sessionStatus === 'active'
+              background: statusColor,
+              flexShrink: 0,
+              boxShadow: sessionStatus === 'active'
                 ? `0 0 0 0 ${statusColor}`
                 : 'none',
               animation: sessionStatus === 'active'
@@ -368,10 +368,10 @@ export default function LiveLocationActive() {
 
           <div style={{ flex: 1 }}>
             <p style={{
-              margin:     0,
+              margin: 0,
               fontWeight: 700,
-              fontSize:   '1rem',
-              color:      statusColor,
+              fontSize: '1rem',
+              color: statusColor,
               fontFamily: 'var(--cf-font-heading)',
             }}>
               {statusLabel}
@@ -389,15 +389,15 @@ export default function LiveLocationActive() {
 
           {sessionStatus === 'active' && (
             <span style={{
-              background:   '#16a34a',
-              color:        '#fff',
+              background: '#16a34a',
+              color: '#fff',
               borderRadius: 999,
-              fontSize:     '0.7rem',
-              fontWeight:   700,
-              padding:      '0.2rem 0.7rem',
+              fontSize: '0.7rem',
+              fontWeight: 700,
+              padding: '0.2rem 0.7rem',
               letterSpacing: '0.05em',
               textTransform: 'uppercase',
-              flexShrink:   0,
+              flexShrink: 0,
             }}>
               LIVE
             </span>
@@ -410,14 +410,14 @@ export default function LiveLocationActive() {
           <div
             role="alert"
             style={{
-              borderRadius:  10,
-              background:    '#fffbeb',
-              border:        '1.5px solid #f59e0b',
-              padding:       '0.85rem 1rem',
-              marginBottom:  '1.25rem',
-              display:       'flex',
-              gap:           '0.65rem',
-              alignItems:    'flex-start',
+              borderRadius: 10,
+              background: '#fffbeb',
+              border: '1.5px solid #f59e0b',
+              padding: '0.85rem 1rem',
+              marginBottom: '1.25rem',
+              display: 'flex',
+              gap: '0.65rem',
+              alignItems: 'flex-start',
             }}
           >
             <i
@@ -441,16 +441,16 @@ export default function LiveLocationActive() {
         )}
         {pingError && (
           <div style={{
-            borderRadius:  8,
-            background:    '#fef3c7',
-            border:        '1px solid #f59e0b',
-            padding:       '0.5rem 0.75rem',
-            fontSize:      '0.8rem',
-            color:         '#92400e',
-            marginBottom:  '1rem',
-            display:       'flex',
-            gap:           '0.4rem',
-            alignItems:    'center',
+            borderRadius: 8,
+            background: '#fef3c7',
+            border: '1px solid #f59e0b',
+            padding: '0.5rem 0.75rem',
+            fontSize: '0.8rem',
+            color: '#92400e',
+            marginBottom: '1rem',
+            display: 'flex',
+            gap: '0.4rem',
+            alignItems: 'center',
           }}>
             <i className="bi bi-wifi-off" />
             {pingError}
@@ -493,7 +493,7 @@ export default function LiveLocationActive() {
             <p style={{ color: 'var(--cf-text-secondary)', fontSize: '0.875rem', margin: '0 0 1.25rem' }}>
               {sessionStatus === 'expired'
                 ? 'Your sharing session has expired. No more location updates are being sent.'
-                : 'You've stopped sharing your location. Admins can no longer see your position.'
+                : "You've stopped sharing your location. Admins can no longer see your position."
               }
             </p>
             <Link to="/dashboard" className="cf-btn cf-btn-primary" style={{ textDecoration: 'none' }}>
@@ -513,22 +513,22 @@ export default function LiveLocationActive() {
                 onClick={handleStop}
                 disabled={stopping}
                 style={{
-                  flex:           '1 1 auto',
-                  padding:        '0.7rem 1rem',
-                  borderRadius:   9,
-                  background:     '#dc2626',
-                  border:         'none',
-                  color:          '#fff',
-                  fontWeight:     700,
-                  fontSize:       '0.9375rem',
-                  cursor:         stopping ? 'not-allowed' : 'pointer',
-                  opacity:        stopping ? 0.7 : 1,
-                  display:        'flex',
-                  alignItems:     'center',
+                  flex: '1 1 auto',
+                  padding: '0.7rem 1rem',
+                  borderRadius: 9,
+                  background: '#dc2626',
+                  border: 'none',
+                  color: '#fff',
+                  fontWeight: 700,
+                  fontSize: '0.9375rem',
+                  cursor: stopping ? 'not-allowed' : 'pointer',
+                  opacity: stopping ? 0.7 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
                   justifyContent: 'center',
-                  gap:            '0.45rem',
-                  fontFamily:     'var(--cf-font-body)',
-                  transition:     'background 140ms',
+                  gap: '0.45rem',
+                  fontFamily: 'var(--cf-font-body)',
+                  transition: 'background 140ms',
                 }}
               >
                 {stopping
@@ -542,20 +542,20 @@ export default function LiveLocationActive() {
                 id="extend-session-btn"
                 onClick={() => setShowExtend((v) => !v)}
                 style={{
-                  flex:           '0 1 auto',
-                  padding:        '0.7rem 1rem',
-                  borderRadius:   9,
-                  background:     'transparent',
-                  border:         '1.5px solid var(--cf-primary)',
-                  color:          'var(--cf-primary)',
-                  fontWeight:     600,
-                  fontSize:       '0.875rem',
-                  cursor:         'pointer',
-                  display:        'flex',
-                  alignItems:     'center',
-                  gap:            '0.4rem',
-                  fontFamily:     'var(--cf-font-body)',
-                  transition:     'background 140ms',
+                  flex: '0 1 auto',
+                  padding: '0.7rem 1rem',
+                  borderRadius: 9,
+                  background: 'transparent',
+                  border: '1.5px solid var(--cf-primary)',
+                  color: 'var(--cf-primary)',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  fontFamily: 'var(--cf-font-body)',
+                  transition: 'background 140ms',
                 }}
               >
                 <i className="bi bi-clock-history" /> Extend
@@ -583,17 +583,17 @@ export default function LiveLocationActive() {
                       onClick={() => handleExtend(value)}
                       disabled={extendLoading}
                       style={{
-                        flex:         1,
-                        padding:      '0.5rem 0',
+                        flex: 1,
+                        padding: '0.5rem 0',
                         borderRadius: 8,
-                        border:       '1.5px solid var(--cf-primary)',
-                        background:   'var(--cf-primary-light)',
-                        color:        'var(--cf-primary)',
-                        fontWeight:   600,
-                        fontSize:     '0.8rem',
-                        cursor:       'pointer',
-                        fontFamily:   'var(--cf-font-body)',
-                        transition:   'background 120ms',
+                        border: '1.5px solid var(--cf-primary)',
+                        background: 'var(--cf-primary-light)',
+                        color: 'var(--cf-primary)',
+                        fontWeight: 600,
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                        fontFamily: 'var(--cf-font-body)',
+                        transition: 'background 120ms',
                       }}
                     >
                       {label}
@@ -614,16 +614,16 @@ export default function LiveLocationActive() {
               <button
                 onClick={() => setShowDetails((v) => !v)}
                 style={{
-                  display:    'flex',
+                  display: 'flex',
                   alignItems: 'center',
-                  gap:        '0.5rem',
+                  gap: '0.5rem',
                   background: 'none',
-                  border:     'none',
-                  cursor:     'pointer',
-                  color:      'var(--cf-primary)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--cf-primary)',
                   fontWeight: 600,
-                  fontSize:   '0.875rem',
-                  padding:    0,
+                  fontSize: '0.875rem',
+                  padding: 0,
                   fontFamily: 'var(--cf-font-body)',
                 }}
                 aria-expanded={showDetails}
@@ -637,19 +637,19 @@ export default function LiveLocationActive() {
                   <textarea
                     value={detailsText}
                     onChange={(e) => setDetailsText(e.target.value)}
-                    placeholder="e.g. "Being followed by a man in a red car on Main St. I'm heading towards the library.""
+                    placeholder="e.g. Being followed by a man in a red car on Main St. I'm heading towards the library."
                     rows={4}
                     style={{
-                      width:        '100%',
-                      padding:      '0.6rem 0.75rem',
-                      border:       '1.5px solid var(--cf-border)',
+                      width: '100%',
+                      padding: '0.6rem 0.75rem',
+                      border: '1.5px solid var(--cf-border)',
                       borderRadius: 8,
-                      fontFamily:   'var(--cf-font-body)',
-                      fontSize:     '0.875rem',
-                      color:        'var(--cf-text)',
-                      resize:       'vertical',
+                      fontFamily: 'var(--cf-font-body)',
+                      fontSize: '0.875rem',
+                      color: 'var(--cf-text)',
+                      resize: 'vertical',
                       marginBottom: '0.5rem',
-                      boxSizing:    'border-box',
+                      boxSizing: 'border-box',
                     }}
                   />
                   <button
@@ -661,8 +661,8 @@ export default function LiveLocationActive() {
                     {detailsSaving
                       ? 'Saving…'
                       : detailsSaved
-                      ? <><i className="bi bi-check-circle" /> Saved</>
-                      : 'Save details'}
+                        ? <><i className="bi bi-check-circle" /> Saved</>
+                        : 'Save details'}
                   </button>
                   {detailsError && (
                     <p style={{ margin: '0.4rem 0 0', fontSize: '0.78rem', color: '#dc2626' }}>{detailsError}</p>
@@ -677,12 +677,12 @@ export default function LiveLocationActive() {
         {sessionStatus === 'active' && (
           <div style={{
             borderRadius: 10,
-            background:   'var(--cf-surface)',
-            border:       '1px solid var(--cf-border-light)',
-            padding:      '0.85rem 1rem',
-            fontSize:     '0.8rem',
-            color:        'var(--cf-text-secondary)',
-            lineHeight:   1.55,
+            background: 'var(--cf-surface)',
+            border: '1px solid var(--cf-border-light)',
+            padding: '0.85rem 1rem',
+            fontSize: '0.8rem',
+            color: 'var(--cf-text-secondary)',
+            lineHeight: 1.55,
           }}>
             <i className="bi bi-info-circle" style={{ marginRight: '0.35rem' }} />
             Admins have been alerted and can see your real-time position on a map.
