@@ -91,8 +91,6 @@ The frontend provides an intuitive interface for **Residents, Staff, and Adminis
 - REST API
 - JWT Authentication
 
-> Update this list if your final frontend implementation uses additional technologies.
-
 ---
 
 ## 🔌 Backend API Integration
@@ -112,7 +110,7 @@ The CivicFix frontend communicates with the CivicFix REST API for authentication
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/ShimboJr/CivicFix-Frontend
+git clone https://github.com/ShimboJr/CivicFix-Frontend.git
 ```
 
 ### 2. Navigate to the Project
@@ -136,8 +134,6 @@ Example:
 ```env
 VITE_API_URL=https://civicfix-backend.vercel.app/api
 ```
-
-> Use the exact environment variable name and backend URL configured in your frontend project.
 
 ### 5. Start the Development Server
 
