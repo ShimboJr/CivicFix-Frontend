@@ -24,6 +24,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link }      from 'react-router-dom';
 import api                                   from '../services/api';
 import DashboardLayout                       from '../components/DashboardLayout';
+import LiveTrackingMap                       from '../components/LiveTrackingMap';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -121,6 +122,10 @@ export default function EmergencyDetail() {
   const [actionSuccess, setActionSuccess] = useState('');
   const [lightbox,      setLightbox]      = useState(null); // image URL or null
 
+  // Live-location session — null while loading, false when none, object when active
+  const [liveSession,     setLiveSession]     = useState(null);
+  const [liveSessionDone, setLiveSessionDone] = useState(false); // true once polled
+
   // ── Fetch report ────────────────────────────────────────────────────────────
   const fetchReport = useCallback(async () => {
     if (!id || id === 'null' || id === 'undefined') {
@@ -145,6 +150,17 @@ export default function EmergencyDetail() {
   }, [id]);
 
   useEffect(() => { fetchReport(); }, [fetchReport]);
+
+  // ── Fetch linked live session once the report is loaded ─────────────────────
+  // Only called when the report exists (report !== null).  The result determines
+  // whether LiveTrackingMap is rendered at the top of the page.
+  useEffect(() => {
+    if (!report) return;
+    api.get(`/live-location/by-report/${id}`)
+      .then(({ data }) => setLiveSession(data.session || null))
+      .catch(() => setLiveSession(null))
+      .finally(() => setLiveSessionDone(true));
+  }, [report, id]);
 
   // ── Actions ─────────────────────────────────────────────────────────────────
   const handleAcknowledge = async () => {
@@ -257,6 +273,29 @@ export default function EmergencyDetail() {
 
         {/* ── LEFT: main content ─────────────────────────────────────────── */}
         <div className="col-12 col-lg-8">
+
+          {/* ── Live tracking map — rendered FIRST when active ─────────── */}
+          {/* A live session is more actionable than any static field below  */}
+          {liveSession && liveSessionDone && (
+            <LiveTrackingMap
+              sessionId={liveSession._id}
+              onEnded={() => setLiveSession(null)}
+            />
+          )}
+
+          {/* Placeholder while the session check is in-flight */}
+          {!liveSessionDone && report?.type === 'Live Location SOS' && (
+            <div style={{
+              border: '2px solid #dc262644', borderRadius: 14,
+              padding: '1rem', marginBottom: '1.25rem',
+              display: 'flex', alignItems: 'center', gap: '0.65rem',
+              color: 'var(--cf-text-muted)', fontSize: '0.875rem',
+              background: '#fff5f5',
+            }}>
+              <div className="cf-spinner" style={{ width: 20, height: 20, borderWidth: 2 }} />
+              Checking for live tracking session…
+            </div>
+          )}
 
           {/* Header card */}
           <div className="cf-card" style={{ marginBottom: '1rem' }}>

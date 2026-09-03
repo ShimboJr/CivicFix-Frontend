@@ -23,6 +23,7 @@ import { useState, useCallback } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import NotificationBell from './NotificationBell';
+import SOSButton from './SOSButton';
 
 // ── Per-role sidebar configuration ───────────────────────────────────────────
 const ROLE_CONFIG = {
@@ -411,6 +412,9 @@ export default function DashboardLayout({ children, title }) {
           {children}
         </main>
       </div>
+
+      {/* ── SOS floating button — residents only, self-hides on live-location page */}
+      <SOSButton />
     </>
   );
 }

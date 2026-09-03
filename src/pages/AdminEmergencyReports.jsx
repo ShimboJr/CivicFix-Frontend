@@ -276,7 +276,7 @@ function MediaAttachment({ item, idx }) {
 }
 
 // ── Subcomponent: prominent card for a 'New' unacknowledged report ────────────
-function NewReportCard({ report, onAcknowledge, onStatusChange, actionLoading }) {
+function NewReportCard({ report, onAcknowledge, onStatusChange, actionLoading, hasLive }) {
   const age   = minutesAgo(report.createdAt);
   const stale = age >= STALE_MINUTES;
 
@@ -313,6 +313,28 @@ function NewReportCard({ report, onAcknowledge, onStatusChange, actionLoading })
           <i className="bi bi-exclamation-triangle-fill" />
           {report.type}
         </div>
+
+        {/* LIVE badge — only when an active LiveLocationSession is linked */}
+        {hasLive && (
+          <span style={{
+            display:      'inline-flex',
+            alignItems:   'center',
+            gap:          '0.3rem',
+            padding:      '0.25rem 0.65rem',
+            background:   '#dc2626',
+            color:        '#fff',
+            borderRadius: '999px',
+            fontWeight:   800,
+            fontSize:     '0.75rem',
+            letterSpacing:'0.06em',
+            textTransform:'uppercase',
+            flexShrink:   0,
+            animation:    'er-live-badge 1.8s ease-in-out infinite',
+          }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff', flexShrink: 0 }} />
+            LIVE
+          </span>
+        )}
 
         {/* Age indicator */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -508,7 +530,7 @@ function NewReportCard({ report, onAcknowledge, onStatusChange, actionLoading })
 }
 
 // ── Subcomponent: compact row for non-New reports ─────────────────────────────
-function OtherReportRow({ report, onStatusChange, actionLoading }) {
+function OtherReportRow({ report, onStatusChange, actionLoading, hasLive }) {
   const STATUS_COLORS = {
     Acknowledged: { bg: '#eff6ff', border: '#93c5fd', text: '#1e40af' },
     Escalated:    { bg: '#fff7ed', border: '#fdba74', text: '#c2410c' },
@@ -546,6 +568,28 @@ function OtherReportRow({ report, onStatusChange, actionLoading }) {
       }}>
         {report.status}
       </span>
+
+      {/* LIVE badge for non-New rows */}
+      {hasLive && (
+        <span style={{
+          display:      'inline-flex',
+          alignItems:   'center',
+          gap:          '0.3rem',
+          padding:      '0.15rem 0.55rem',
+          background:   '#dc2626',
+          color:        '#fff',
+          borderRadius: '999px',
+          fontWeight:   800,
+          fontSize:     '0.68rem',
+          letterSpacing:'0.06em',
+          textTransform:'uppercase',
+          flexShrink:   0,
+          animation:    'er-live-badge 1.8s ease-in-out infinite',
+        }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff', flexShrink: 0 }} />
+          LIVE
+        </span>
+      )}
 
       {/* Type */}
       <span style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--cf-text)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -636,6 +680,12 @@ export default function AdminEmergencyReports() {
   const [stats,        setStats]        = useState(null);
   const [statsLoading, setStatsLoading] = useState(true);
 
+  // ── Live session ids — Set of report._id strings that have an active session
+  // Populated asynchronously after each fetchReports, using Promise.allSettled
+  // so one failing query never blocks the rest.  The set is used to render
+  // the LIVE badge on cards without blocking the main report list render.
+  const [liveIds, setLiveIds] = useState(new Set());
+
   const refreshTimer = useRef(null);
 
   // ── Data fetching ──────────────────────────────────────────────────────────
@@ -655,7 +705,23 @@ export default function AdminEmergencyReports() {
     setError('');
     try {
       const res = await api.get('/emergency-reports');
-      setReports(res.data);
+      const data = res.data;
+      setReports(data);
+
+      // ── Check which reports have an active live session ─────────────────
+      // Run in parallel, silently ignore failures (badge absence is non-critical).
+      const checks = data.map((r) =>
+        api.get(`/live-location/by-report/${r._id}`)
+          .then(({ data: d }) => (d.session ? r._id : null))
+          .catch(() => null)
+      );
+      const results = await Promise.allSettled(checks);
+      const ids = new Set(
+        results
+          .filter((r) => r.status === 'fulfilled' && r.value != null)
+          .map((r) => r.value)
+      );
+      setLiveIds(ids);
     } catch (err) {
       setError(err.message || 'Failed to load emergency reports.');
     } finally {
@@ -686,6 +752,10 @@ export default function AdminEmergencyReports() {
         @keyframes er-pulse-border {
           0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
           50%      { box-shadow: 0 0 0 4px rgba(239,68,68,0.35); }
+        }
+        @keyframes er-live-badge {
+          0%,100% { opacity: 1; }
+          50%      { opacity: 0.65; }
         }
       `;
       document.head.appendChild(style);
@@ -863,6 +933,7 @@ export default function AdminEmergencyReports() {
               onAcknowledge={handleAcknowledge}
               onStatusChange={handleStatusChange}
               actionLoading={actionLoading}
+              hasLive={liveIds.has(report._id)}
             />
           ))}
         </section>
@@ -897,6 +968,7 @@ export default function AdminEmergencyReports() {
               report={report}
               onStatusChange={handleStatusChange}
               actionLoading={actionLoading}
+              hasLive={liveIds.has(report._id)}
             />
           ))}
         </section>
