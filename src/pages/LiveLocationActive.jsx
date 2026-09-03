@@ -292,23 +292,14 @@ export default function LiveLocationActive() {
   }, [startedAt]);
 
   // ── Save additional description ───────────────────────────────────────────
-  // PATCHes the linked EmergencyReport's description via the emergency endpoint.
+  // Calls PATCH /api/live-location/:id/note — a resident-accessible endpoint
+  // that writes the note to the linked EmergencyReport's description field.
+  // This avoids the admin-only emergency-report status endpoint entirely.
   const handleSaveDetails = useCallback(async () => {
-    if (!navState.reportId) {
-      setDetailsError('No linked report found — details cannot be saved.');
-      return;
-    }
     setDetailsSaving(true);
     setDetailsError('');
     try {
-      // The existing emergency reports API accepts a PUT/status update;
-      // we'll PATCH the description via the generic update endpoint.
-      // If no dedicated endpoint exists yet, we use the status endpoint trick
-      // and only update description.
-      // TODO: add PATCH /api/emergency-reports/:id route for partial updates.
-      await api.put(`/emergency-reports/${navState.reportId}/status`, {
-        description: detailsText,
-      });
+      await api.patch(`/live-location/${id}/note`, { note: detailsText });
       setDetailsSaved(true);
       setTimeout(() => setDetailsSaved(false), 3000);
     } catch (err) {
@@ -316,7 +307,7 @@ export default function LiveLocationActive() {
     } finally {
       setDetailsSaving(false);
     }
-  }, [navState.reportId, detailsText]);
+  }, [id, detailsText]);
 
   // ── Derived values ────────────────────────────────────────────────────────
   const isEnded = sessionStatus === 'ended' || sessionStatus === 'expired';
