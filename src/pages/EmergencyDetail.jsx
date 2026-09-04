@@ -122,7 +122,9 @@ export default function EmergencyDetail() {
   const [actionSuccess, setActionSuccess] = useState('');
   const [lightbox,      setLightbox]      = useState(null); // image URL or null
 
-  // Live-location session — null while loading, false when none, object when active
+  // Live-location session — null while loading, false when none, object when found.
+  // Covers active, ended, and expired sessions so the map stays visible after
+  // a session ends (switching to the static Movement History view).
   const [liveSession,     setLiveSession]     = useState(null);
   const [liveSessionDone, setLiveSessionDone] = useState(false); // true once polled
 
@@ -152,8 +154,10 @@ export default function EmergencyDetail() {
   useEffect(() => { fetchReport(); }, [fetchReport]);
 
   // ── Fetch linked live session once the report is loaded ─────────────────────
-  // Only called when the report exists (report !== null).  The result determines
-  // whether LiveTrackingMap is rendered at the top of the page.
+  // Returns any session (active, ended, or expired) linked to this report.
+  // An ended/expired session is still worth showing as a static Movement
+  // History view — keeping the same "always-accessible detail" principle
+  // already applied to EmergencyDetail itself.
   useEffect(() => {
     if (!report) return;
     api.get(`/live-location/by-report/${id}`)
@@ -279,7 +283,13 @@ export default function EmergencyDetail() {
           {liveSession && liveSessionDone && (
             <LiveTrackingMap
               sessionId={liveSession._id}
-              onEnded={() => setLiveSession(null)}
+              onEnded={(newStatus) =>
+                // Keep the map mounted — update the local session status so
+                // LiveTrackingMap switches to its static Movement History view
+                // rather than disappearing.  The admin should always be able
+                // to review where the person was, even after the session ends.
+                setLiveSession((prev) => prev ? { ...prev, status: newStatus } : prev)
+              }
             />
           )}
 
