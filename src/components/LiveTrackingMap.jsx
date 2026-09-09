@@ -31,10 +31,16 @@
  *   persistent WebSocket connection.
  *
  * Props:
- *   sessionId  {string}  — LiveLocationSession._id to track
- *   onEnded    {fn?}     — optional callback fired when status turns non-active
- *                          (receives the new status string; does NOT mean the
- *                           map disappears — the parent must decide that)
+ *   sessionId        {string}  — LiveLocationSession._id to track
+ *   onEnded          {fn?}     — optional callback fired when status turns non-active
+ *                               (receives the new status string; does NOT mean the
+ *                               map disappears — the parent must decide that)
+ *   onLocationUpdate {fn?}     — optional callback fired after every successful
+ *                               fetch (initial load + every poll).  Receives the
+ *                               full session object so the parent can reactively
+ *                               reflect the latest currentLocation (e.g. for an
+ *                               "Open in Maps" link that always points to the
+ *                               most-recent known position, not a one-time snapshot).
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -162,7 +168,7 @@ function BoundsFitter({ positions }) {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function LiveTrackingMap({ sessionId, onEnded }) {
+export default function LiveTrackingMap({ sessionId, onEnded, onLocationUpdate }) {
   const [session,      setSession]      = useState(null);
   const [loading,      setLoading]      = useState(true);
   const [fetchError,   setFetchError]   = useState('');
@@ -181,6 +187,10 @@ export default function LiveTrackingMap({ sessionId, onEnded }) {
       setSession(data);
       setFetchError('');
 
+      // Notify parent of the latest session data so it can reactively update
+      // anything that depends on currentLocation (e.g. an "Open in Maps" link).
+      if (onLocationUpdate) onLocationUpdate(data);
+
       // Stop polling once session is no longer active
       if (data.status !== 'active') {
         isActiveRef.current = false;
@@ -193,7 +203,7 @@ export default function LiveTrackingMap({ sessionId, onEnded }) {
     } finally {
       setLoading(false);
     }
-  }, [sessionId, onEnded]);
+  }, [sessionId, onEnded, onLocationUpdate]);
 
   // ── On mount: initial fetch + polling (active only) + 1-s UI ticker ──────
   useEffect(() => {

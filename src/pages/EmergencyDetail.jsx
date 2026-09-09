@@ -128,6 +128,12 @@ export default function EmergencyDetail() {
   const [liveSession,     setLiveSession]     = useState(null);
   const [liveSessionDone, setLiveSessionDone] = useState(false); // true once polled
 
+  // Reactive live-location coordinates for "Open in Maps".
+  // Seeded from liveSession.currentLocation on first resolution, then kept
+  // up-to-date by onLocationUpdate fired by LiveTrackingMap on every poll.
+  // Shape: { latitude, longitude, accuracy?, lastPingAt? } | null
+  const [liveTrackingPos, setLiveTrackingPos] = useState(null);
+
   // ── Fetch report ────────────────────────────────────────────────────────────
   const fetchReport = useCallback(async () => {
     if (!id || id === 'null' || id === 'undefined') {
@@ -161,10 +167,39 @@ export default function EmergencyDetail() {
   useEffect(() => {
     if (!report) return;
     api.get(`/live-location/by-report/${id}`)
-      .then(({ data }) => setLiveSession(data.session || null))
+      .then(({ data }) => {
+        const s = data.session || null;
+        setLiveSession(s);
+        // Pre-seed liveTrackingPos from the initial fetch so the "Open in Maps"
+        // link has valid coordinates immediately (before LiveTrackingMap fires
+        // its own first internal poll).
+        if (s?.currentLocation) {
+          setLiveTrackingPos({
+            latitude:    s.currentLocation.latitude,
+            longitude:   s.currentLocation.longitude,
+            accuracy:    s.currentLocation.accuracy ?? null,
+            lastPingAt:  s.lastPingAt ?? null,
+          });
+        }
+      })
       .catch(() => setLiveSession(null))
       .finally(() => setLiveSessionDone(true));
   }, [report, id]);
+
+  // ── Callback: keep liveTrackingPos in sync with LiveTrackingMap polls ────────
+  // LiveTrackingMap calls this after every successful fetch (initial load + every
+  // 10-second poll).  We update liveTrackingPos so the "Open in Maps" link always
+  // reflects the true most-recent known position while the admin has the page open.
+  const handleLocationUpdate = useCallback((sessionData) => {
+    if (sessionData?.currentLocation) {
+      setLiveTrackingPos({
+        latitude:   sessionData.currentLocation.latitude,
+        longitude:  sessionData.currentLocation.longitude,
+        accuracy:   sessionData.currentLocation.accuracy ?? null,
+        lastPingAt: sessionData.lastPingAt ?? null,
+      });
+    }
+  }, []);
 
   // ── Actions ─────────────────────────────────────────────────────────────────
   const handleAcknowledge = async () => {
@@ -290,6 +325,7 @@ export default function EmergencyDetail() {
                 // to review where the person was, even after the session ends.
                 setLiveSession((prev) => prev ? { ...prev, status: newStatus } : prev)
               }
+              onLocationUpdate={handleLocationUpdate}
             />
           )}
 
@@ -537,28 +573,99 @@ export default function EmergencyDetail() {
           {/* Location */}
           <div className="cf-card">
             <h3 style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.75rem', color: 'var(--cf-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              <i className="bi bi-geo-alt-fill me-1" style={{ color: '#dc2626' }} />Location
+              <i className="bi bi-geo-alt-fill me-1" style={{ color: '#dc2626' }} />
+              {liveTrackingPos ? 'Current Location' : 'Location'}
             </h3>
 
-            <p style={{ margin: '0 0 0.25rem', fontSize: '0.88rem', color: 'var(--cf-text)', wordBreak: 'break-word', lineHeight: 1.5 }}>
-              {report.location?.address || '—'}
-            </p>
+            {/* ── Live-session location ──────────────────────────────────────
+                 When a linked LiveLocationSession exists, show the most-recent
+                 known position (from currentLocation, kept up-to-date by the
+                 onLocationUpdate poll), not the static starting-point stored on
+                 report.location.  The starting-point address is shown below as
+                 a secondary reference so the admin still knows the origin.     */}
+            {liveTrackingPos ? (
+              <>
+                {/* Live coords chip */}
+                <div style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                  padding: '0.2rem 0.6rem',
+                  background: liveSession?.status === 'active' ? '#dcfce7' : '#f1f5f9',
+                  border: `1px solid ${liveSession?.status === 'active' ? '#16a34a' : '#94a3b8'}`,
+                  borderRadius: 999, fontSize: '0.72rem', fontWeight: 700,
+                  color: liveSession?.status === 'active' ? '#15803d' : '#475569',
+                  marginBottom: '0.5rem',
+                }}>
+                  <i className={`bi ${liveSession?.status === 'active' ? 'bi-broadcast-pin' : 'bi-clock-history'}`} />
+                  {liveSession?.status === 'active' ? 'Live position' : 'Last known position'}
+                </div>
 
-            {hasCoords && (
-              <p style={{ margin: '0 0 0.35rem', fontSize: '0.72rem', color: 'var(--cf-text-muted)', fontFamily: 'monospace' }}>
-                {report.location.latitude.toFixed(6)}, {report.location.longitude.toFixed(6)}
-              </p>
-            )}
+                {/* Coordinates */}
+                <p style={{ margin: '0 0 0.35rem', fontSize: '0.72rem', color: 'var(--cf-text-muted)', fontFamily: 'monospace' }}>
+                  {liveTrackingPos.latitude.toFixed(6)}, {liveTrackingPos.longitude.toFixed(6)}
+                </p>
 
-            {hasCoords && (
-              <a
-                href={`https://www.google.com/maps?q=${report.location.latitude},${report.location.longitude}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ fontSize: '0.8rem', color: 'var(--cf-primary)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
-              >
-                <i className="bi bi-map" /> Open in Maps
-              </a>
+                {/* Context: age + accuracy — the two numbers a responder needs */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem 0.85rem', marginBottom: '0.65rem' }}>
+                  {liveTrackingPos.lastPingAt && (
+                    <span style={{ fontSize: '0.78rem', color: 'var(--cf-text-secondary)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <i className="bi bi-clock" style={{ color: '#64748b' }} />
+                      Last known: <strong>{formatAge(liveTrackingPos.lastPingAt)}</strong>
+                    </span>
+                  )}
+                  {liveTrackingPos.accuracy != null && (
+                    <span style={{ fontSize: '0.78rem', color: 'var(--cf-text-secondary)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <i className="bi bi-crosshair" style={{ color: '#64748b' }} />
+                      <strong>±{Math.round(liveTrackingPos.accuracy)} m</strong>
+                    </span>
+                  )}
+                </div>
+
+                {/* Open in Maps — uses live coords, not report.location */}
+                <a
+                  href={`https://www.google.com/maps?q=${liveTrackingPos.latitude},${liveTrackingPos.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontSize: '0.8rem', color: 'var(--cf-primary)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.75rem' }}
+                >
+                  <i className="bi bi-map" /> Open in Maps
+                </a>
+
+                {/* Divider + starting-point reference */}
+                {report.location?.address && (
+                  <div style={{ borderTop: '1px solid var(--cf-border-light)', paddingTop: '0.65rem', marginTop: '0.1rem' }}>
+                    <p style={{ margin: '0 0 0.15rem', fontSize: '0.72rem', fontWeight: 700, color: 'var(--cf-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Starting address
+                    </p>
+                    <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--cf-text-muted)', lineHeight: 1.5, wordBreak: 'break-word' }}>
+                      {report.location.address}
+                    </p>
+                  </div>
+                )}
+              </>
+            ) : (
+              /* ── Static report location (no linked live session) ───────── */
+              <>
+                <p style={{ margin: '0 0 0.25rem', fontSize: '0.88rem', color: 'var(--cf-text)', wordBreak: 'break-word', lineHeight: 1.5 }}>
+                  {report.location?.address || '—'}
+                </p>
+
+                {hasCoords && (
+                  <p style={{ margin: '0 0 0.35rem', fontSize: '0.72rem', color: 'var(--cf-text-muted)', fontFamily: 'monospace' }}>
+                    {report.location.latitude.toFixed(6)}, {report.location.longitude.toFixed(6)}
+                  </p>
+                )}
+
+                {hasCoords && (
+                  <a
+                    href={`https://www.google.com/maps?q=${report.location.latitude},${report.location.longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ fontSize: '0.8rem', color: 'var(--cf-primary)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                  >
+                    <i className="bi bi-map" /> Open in Maps
+                  </a>
+                )}
+              </>
             )}
           </div>
 
