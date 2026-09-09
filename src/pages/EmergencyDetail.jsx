@@ -123,6 +123,42 @@ function buildRouteUrl(trail, destination) {
   return `https://www.google.com/maps/dir/?${params.toString()}`;
 }
 
+/**
+ * buildHandoffText(report, liveTrackingPos)
+ *
+ * Builds the formatted plaintext block that gets written to the clipboard or
+ * passed to navigator.share.  Called at the moment the admin taps the button
+ * so it always reflects the latest liveTrackingPos — never a stale snapshot.
+ *
+ * @param {object} report          — the EmergencyReport document
+ * @param {object} liveTrackingPos — { latitude, longitude, accuracy?, lastPingAt?, trail? }
+ * @returns {string}
+ */
+function buildHandoffText(report, liveTrackingPos) {
+  const reporterName = report.reporter?.name || 'Unknown';
+  const refId        = `#${String(report._id).slice(-8).toUpperCase()}`;
+  const lat          = liveTrackingPos.latitude.toFixed(6);
+  const lng          = liveTrackingPos.longitude.toFixed(6);
+  const accuracy     = liveTrackingPos.accuracy != null
+    ? ` \u00b1${Math.round(liveTrackingPos.accuracy)}m`
+    : '';
+  const age = liveTrackingPos.lastPingAt
+    ? ` — ${formatAge(liveTrackingPos.lastPingAt)}`
+    : '';
+
+  const pinUrl   = `https://www.google.com/maps?q=${lat},${lng}`;
+  const routeUrl = buildRouteUrl(liveTrackingPos.trail, liveTrackingPos);
+
+  const lines = [
+    `\uD83D\uDEA8 CivicFix Emergency \u2014 Live Location for ${reporterName} (${refId})`,
+    `Last known: ${lat}, ${lng}${accuracy}${age}`,
+    `Directions: ${pinUrl}`,
+    ...(routeUrl ? [`Full route (approx): ${routeUrl}`] : []),
+  ];
+
+  return lines.join('\n');
+}
+
 // ── Subcomponent: expandable media item ──────────────────────────────────────
 function MediaItem({ item, idx, onLightbox }) {
   if (item.type === 'image') {
@@ -199,6 +235,11 @@ export default function EmergencyDetail() {
   //            buildRouteUrl to construct the waypointed route link.
   const [liveTrackingPos, setLiveTrackingPos] = useState(null);
 
+  // Clipboard feedback — 'idle' | 'copied' | 'error'
+  // Briefly switches to 'copied' after a successful writeText so the button
+  // turns green for 2 seconds without needing a toast library.
+  const [copyFeedback, setCopyFeedback] = useState('idle');
+
   // ── Fetch report ────────────────────────────────────────────────────────────
   const fetchReport = useCallback(async () => {
     if (!id || id === 'null' || id === 'undefined') {
@@ -268,6 +309,36 @@ export default function EmergencyDetail() {
       });
     }
   }, []);
+
+  // ── Responder handoff actions ─────────────────────────────────────────────────
+  // Text is built at call time (not stored in state) so it always reflects the
+  // latest liveTrackingPos at the moment the admin taps — never a cached snapshot.
+
+  const handleCopy = useCallback(async () => {
+    if (!liveTrackingPos || !report) return;
+    try {
+      await navigator.clipboard.writeText(buildHandoffText(report, liveTrackingPos));
+      setCopyFeedback('copied');
+      setTimeout(() => setCopyFeedback('idle'), 2000);
+    } catch {
+      setCopyFeedback('error');
+      setTimeout(() => setCopyFeedback('idle'), 2500);
+    }
+  }, [liveTrackingPos, report]);
+
+  const handleShare = useCallback(async () => {
+    if (!liveTrackingPos || !report) return;
+    const text = buildHandoffText(report, liveTrackingPos);
+    try {
+      await navigator.share({
+        title: `CivicFix Emergency — ${report.reporter?.name || 'Unknown'}`,
+        text,
+      });
+    } catch {
+      // User cancelled or share was denied — treat as a normal interaction, not
+      // an error; the admin chose not to complete the share.  No feedback needed.
+    }
+  }, [liveTrackingPos, report]);
 
   // ── Actions ─────────────────────────────────────────────────────────────────
   const handleAcknowledge = async () => {
@@ -395,6 +466,127 @@ export default function EmergencyDetail() {
               }
               onLocationUpdate={handleLocationUpdate}
             />
+          )}
+
+          {/* ── Responder Handoff panel ───────────────────────────────────────
+               Only rendered when a live session exists and we have a known
+               position.  Gives admins one-tap access to Copy or Share a
+               formatted location block without manually reading out coords.  */}
+          {liveTrackingPos && liveSessionDone && (
+            <div style={{
+              border:        '1.5px solid #7c3aed44',
+              borderRadius:  12,
+              background:    '#faf5ff',
+              marginBottom:  '1.25rem',
+              overflow:      'hidden',
+            }}>
+
+              {/* Header */}
+              <div style={{
+                padding:      '0.6rem 1rem',
+                background:   '#7c3aed',
+                display:      'flex',
+                alignItems:   'center',
+                gap:          '0.55rem',
+              }}>
+                <i className="bi bi-send-fill" style={{ color: '#e9d5ff', fontSize: '0.9rem' }} />
+                <span style={{ color: '#fff', fontWeight: 700, fontSize: '0.875rem', fontFamily: 'var(--cf-font-heading)' }}>
+                  Responder Handoff
+                </span>
+                <span style={{
+                  marginLeft:    'auto',
+                  fontSize:      '0.7rem',
+                  color:         '#d8b4fe',
+                  fontStyle:     'italic',
+                }}>
+                  Share current location with police / security
+                </span>
+              </div>
+
+              {/* Preview of what will be copied / shared */}
+              <pre style={{
+                margin:      0,
+                padding:     '0.75rem 1rem',
+                fontSize:    '0.75rem',
+                fontFamily:  'monospace',
+                color:       '#4c1d95',
+                background:  'transparent',
+                whiteSpace:  'pre-wrap',
+                wordBreak:   'break-word',
+                lineHeight:  1.55,
+                borderBottom:'1px solid #ede9fe',
+              }}>
+                {buildHandoffText(report, liveTrackingPos)}
+              </pre>
+
+              {/* Action buttons */}
+              <div style={{
+                padding:    '0.6rem 1rem',
+                display:    'flex',
+                gap:        '0.6rem',
+                flexWrap:   'wrap',
+                alignItems: 'center',
+              }}>
+
+                {/* Copy Details */}
+                <button
+                  id="er-handoff-copy"
+                  onClick={handleCopy}
+                  style={{
+                    display:      'inline-flex',
+                    alignItems:   'center',
+                    gap:          '0.4rem',
+                    padding:      '0.45rem 1rem',
+                    borderRadius: 8,
+                    border:       'none',
+                    fontWeight:   700,
+                    fontSize:     '0.82rem',
+                    cursor:       'pointer',
+                    transition:   'background 200ms, color 200ms',
+                    background:   copyFeedback === 'copied' ? '#16a34a'
+                                : copyFeedback === 'error'  ? '#b91c1c'
+                                : '#7c3aed',
+                    color:        '#fff',
+                  }}
+                >
+                  <i className={`bi ${copyFeedback === 'copied' ? 'bi-check-lg' : copyFeedback === 'error' ? 'bi-x-circle' : 'bi-clipboard'}`} />
+                  {copyFeedback === 'copied' ? 'Copied ✓'
+                    : copyFeedback === 'error' ? 'Copy failed'
+                    : 'Copy Details'}
+                </button>
+
+                {/* Share — only rendered when the Web Share API is available.
+                    navigator.share is absent on most desktop browsers, so hiding
+                    the button when unavailable avoids a silently-failing click. */}
+                {typeof navigator.share === 'function' && (
+                  <button
+                    id="er-handoff-share"
+                    onClick={handleShare}
+                    style={{
+                      display:      'inline-flex',
+                      alignItems:   'center',
+                      gap:          '0.4rem',
+                      padding:      '0.45rem 1rem',
+                      borderRadius: 8,
+                      border:       '1.5px solid #7c3aed',
+                      background:   '#fff',
+                      color:        '#7c3aed',
+                      fontWeight:   700,
+                      fontSize:     '0.82rem',
+                      cursor:       'pointer',
+                    }}
+                  >
+                    <i className="bi bi-share" />
+                    Share
+                  </button>
+                )}
+
+                <span style={{ fontSize: '0.7rem', color: '#6d28d9', fontStyle: 'italic', marginLeft: 'auto' }}>
+                  <i className="bi bi-info-circle me-1" />
+                  Updates with each new ping
+                </span>
+              </div>
+            </div>
           )}
 
           {/* Placeholder while the session check is in-flight */}
