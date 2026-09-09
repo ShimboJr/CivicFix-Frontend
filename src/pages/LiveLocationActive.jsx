@@ -23,9 +23,12 @@ import DashboardLayout from '../components/DashboardLayout';
 import api from '../services/api';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const PING_INTERVAL_MS = 12_000;  // send a ping every 12 s (throttle)
-const TICK_INTERVAL_MS = 1_000;   // UI clock update
-const MAX_TOTAL_MINUTES = 8 * 60;  // absolute cap when extending (8 hours)
+const PING_INTERVAL_MS    = 12_000;  // send a ping every 12 s (throttle)
+const TICK_INTERVAL_MS    = 1_000;   // UI clock update
+const MAX_TOTAL_MINUTES   = 8 * 60;  // absolute cap when extending (8 hours)
+// Message poll — intentionally a slightly different cadence from the ping
+// interval so they never fire simultaneously and compete on the same tick.
+const MESSAGE_POLL_MS     = 13_000;  // check for new admin messages every 13 s
 const EXTEND_OPTIONS = [
   { label: '+15 min', value: 15 },
   { label: '+1 hr', value: 60 },
@@ -42,6 +45,14 @@ function fmtDuration(totalSeconds) {
     return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   }
   return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+// ── Helper — format a timestamp as HH:MM:SS (local) ──────────────────────────
+function fmtTime(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleTimeString('en-GB', {
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
 }
 
 // ── Helper — get JWT from localStorage for Beacon fallback ───────────────────
@@ -82,12 +93,31 @@ export default function LiveLocationActive() {
   const [detailsSaved, setDetailsSaved] = useState(false);
   const [detailsError, setDetailsError] = useState('');
 
+  // ── Admin-message state ────────────────────────────────────────────────────
+  // `messages` — ordered list of SessionMessage docs from the server.
+  // Rendered quietly in a panel; no sound/badge/notification on update.
+  const [messages,      setMessages]      = useState([]);
+  // Set of message _ids already displayed — used to know if new ones arrived
+  // without having to diff the full array on every poll.
+  const [seenMsgIds,    setSeenMsgIds]    = useState(new Set());
+  // Tracks the most-recently-arrived message timestamp for the "new message"
+  // soft highlight (fades after 8 s; no sound or OS alert).
+  const [newestMsgId,   setNewestMsgId]   = useState(null);
+
+  // ── "I'm Safe" state ──────────────────────────────────────────────────────
+  // Purely local — stamping the timestamp on the server does NOT change
+  // session status or stop pings; it only informs admins.
+  const [safeConfirmed,  setSafeConfirmed]  = useState(false);  // shows quiet confirmation
+  const [safeConfirming, setSafeConfirming] = useState(false);  // in-flight
+  const [safeError,      setSafeError]      = useState('');
+
   // ── Refs — used inside closures to avoid stale-state issues ───────────────
-  const activeRef = useRef(true);   // set to false on unmount/stop/expire
-  const watchIdRef = useRef(null);   // geolocation.watchPosition id
-  const latestPosRef = useRef(null);   // the most recent position from watchPosition
-  const pingTimerRef = useRef(null);   // setInterval id for throttled pings
-  const expiresAtRef = useRef(expiresAt);
+  const activeRef       = useRef(true);    // set to false on unmount/stop/expire
+  const watchIdRef      = useRef(null);    // geolocation.watchPosition id
+  const latestPosRef    = useRef(null);    // the most recent position from watchPosition
+  const pingTimerRef    = useRef(null);    // setInterval id for throttled pings
+  const msgPollTimerRef = useRef(null);    // setInterval id for message polling
+  const expiresAtRef    = useRef(expiresAt);
 
   // Keep expiresAtRef in sync with state
   useEffect(() => { expiresAtRef.current = expiresAt; }, [expiresAt]);
@@ -192,7 +222,7 @@ export default function LiveLocationActive() {
     }
   }, [id]);
 
-  // ── teardown — stops watchPosition and the ping interval ─────────────────
+  // ── teardown — stops watchPosition, the ping interval, and the msg poll ──
   const teardown = useCallback(() => {
     activeRef.current = false;
     if (watchIdRef.current != null) {
@@ -202,6 +232,10 @@ export default function LiveLocationActive() {
     if (pingTimerRef.current != null) {
       clearInterval(pingTimerRef.current);
       pingTimerRef.current = null;
+    }
+    if (msgPollTimerRef.current != null) {
+      clearInterval(msgPollTimerRef.current);
+      msgPollTimerRef.current = null;
     }
   }, []);
 
@@ -290,6 +324,82 @@ export default function LiveLocationActive() {
     setShowExtend(false);
     setExtendLoading(false);
   }, [startedAt]);
+
+  // ── Message polling — separate loop from the ping interval ─────────────────
+  // ⚠️  SILENT BY DESIGN:
+  //   This loop must NEVER trigger a sound, browser notification, badge update,
+  //   or any OS-level alert.  New messages become visible only because the panel
+  //   re-renders with new content — discoverable only when the resident is
+  //   already looking at the screen.  This is a deliberate safety property.
+  useEffect(() => {
+    if (sessionStatus !== 'active') return;
+
+    const poll = async () => {
+      if (!activeRef.current) return;
+      try {
+        const { data } = await api.get(`/live-location/${id}/messages`);
+        const incoming = data.messages ?? [];
+        if (!incoming.length) return;
+
+        // Only update state when there are actually new messages so we avoid
+        // spurious re-renders on polls that return the same list.
+        const incomingIds = new Set(incoming.map((m) => m._id));
+        setSeenMsgIds((prev) => {
+          // Find any id not yet in our seen set
+          const newIds = [...incomingIds].filter((mid) => !prev.has(mid));
+          if (!newIds.length) return prev; // nothing new — bail out early
+
+          // Soft-highlight the newest: briefly set newestMsgId, clear after 8 s.
+          // 8 s is long enough for the resident to notice if looking at the screen,
+          // but short enough that a threat actor glancing over won't see a
+          // lingering visual cue for long.
+          const latestMsg = incoming[incoming.length - 1];
+          setNewestMsgId(latestMsg._id);
+          setTimeout(() => setNewestMsgId(null), 8_000);
+
+          setMessages(incoming);
+          return incomingIds; // replace the whole set rather than merging
+        });
+      } catch {
+        // Network glitch — swallow silently; will retry on the next interval.
+        // Do NOT show an error UI here — that would draw attention to the phone.
+      }
+    };
+
+    // Run immediately on mount to pick up any messages sent before this page load
+    poll();
+    msgPollTimerRef.current = setInterval(poll, MESSAGE_POLL_MS);
+
+    return () => {
+      if (msgPollTimerRef.current != null) {
+        clearInterval(msgPollTimerRef.current);
+        msgPollTimerRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, sessionStatus]);
+
+  // ── "I'm Safe" confirmation ───────────────────────────────────────────────
+  // Stamps `reporterConfirmedSafeAt` on the session server-side.
+  //
+  // ⚠️  SAFETY CONTRACT (mirrors the server-side invariant):
+  //   This MUST NOT stop location sharing, call teardown, or change
+  //   sessionStatus.  The ping loop continues exactly as before.
+  //   A coerced tap under duress should not be able to end tracking.
+  const handleConfirmSafe = useCallback(async () => {
+    if (safeConfirming) return;
+    setSafeConfirming(true);
+    setSafeError('');
+    try {
+      await api.post(`/live-location/${id}/confirm-safe`);
+      setSafeConfirmed(true);
+      // No teardown. No status change. Ping loop untouched.
+    } catch (err) {
+      setSafeError(err.response?.data?.message ?? 'Could not send confirmation. Please try again.');
+    } finally {
+      setSafeConfirming(false);
+    }
+  }, [id, safeConfirming]);
 
   // ── Save additional description ───────────────────────────────────────────
   // Calls PATCH /api/live-location/:id/note — a resident-accessible endpoint
@@ -467,6 +577,144 @@ export default function LiveLocationActive() {
                 Last ping: {lastPingAt.toLocaleTimeString()}
                 &nbsp;·&nbsp;Next ping in ~{Math.round(PING_INTERVAL_MS / 1000)} s
               </p>
+            )}
+          </div>
+        )}
+
+        {/* ── Admin messages panel — quiet, poll-based, zero OS alerts ─────
+             Rendered whenever active AND the server has sent at least one
+             message, OR always while active so the resident knows it exists.
+             ⚠️  No sound, no badge, no notification — messages are surfaced
+             only by this panel re-rendering while the screen is already on.  */}
+        {sessionStatus === 'active' && (
+          <div
+            id="admin-messages-panel"
+            style={{
+              borderRadius:  10,
+              background:    '#f0f7fb',
+              border:        '1px solid #0B4F6C33',
+              marginBottom:  '1.25rem',
+              overflow:      'hidden',
+            }}
+          >
+            {/* Panel header — deliberately low-key */}
+            <div style={{
+              padding:    '0.45rem 0.85rem',
+              background: '#0B4F6C',
+              display:    'flex',
+              alignItems: 'center',
+              gap:        '0.45rem',
+            }}>
+              <i className="bi bi-chat-square-text" style={{ color: '#bae6fd', fontSize: '0.8rem' }} />
+              <span style={{
+                color:      '#e0f2fe',
+                fontWeight: 600,
+                fontSize:   '0.78rem',
+                fontFamily: 'var(--cf-font-heading)',
+              }}>
+                Messages from the monitoring team
+              </span>
+            </div>
+
+            <div style={{ padding: '0.65rem 0.85rem' }}>
+              {messages.length === 0 ? (
+                <p style={{
+                  margin:    0,
+                  fontSize:  '0.78rem',
+                  color:     'var(--cf-text-muted)',
+                  fontStyle: 'italic',
+                }}>
+                  No messages yet.
+                </p>
+              ) : (
+                <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                  {messages.map((msg) => {
+                    const isNew = msg._id === newestMsgId;
+                    return (
+                      <li
+                        key={msg._id}
+                        style={{
+                          padding:      '0.4rem 0.6rem',
+                          borderRadius: 6,
+                          background:   isNew ? '#dbeafe' : 'var(--cf-surface)',
+                          border:       `1px solid ${isNew ? '#93c5fd' : 'var(--cf-border-light)'}`,
+                          transition:   'background 1s, border-color 1s',
+                        }}
+                      >
+                        <p style={{ margin: '0 0 0.15rem', fontSize: '0.85rem', color: 'var(--cf-text)', lineHeight: 1.5 }}>
+                          {msg.text}
+                        </p>
+                        <p style={{ margin: 0, fontSize: '0.68rem', color: 'var(--cf-text-muted)' }}>
+                          {fmtTime(msg.createdAt)}
+                        </p>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── "I'm Safe" button — separate from Stop Sharing ───────────────
+             Stamps a timestamp on the session; DOES NOT stop sharing or
+             call teardown.  Shown while active, hidden once sharing stops. */}
+        {sessionStatus === 'active' && (
+          <div style={{ marginBottom: '1.25rem' }}>
+            {safeConfirmed ? (
+              <div style={{
+                display:      'flex',
+                alignItems:   'center',
+                gap:          '0.5rem',
+                padding:      '0.6rem 0.85rem',
+                borderRadius: 8,
+                background:   '#f0fdf4',
+                border:       '1px solid #86efac',
+                fontSize:     '0.83rem',
+                color:        '#166534',
+              }}>
+                <i className="bi bi-shield-check-fill" style={{ flexShrink: 0 }} />
+                Admins have been notified. Sharing continues.
+              </div>
+            ) : (
+              <>
+                <button
+                  id="confirm-safe-btn"
+                  onClick={handleConfirmSafe}
+                  disabled={safeConfirming}
+                  style={{
+                    width:        '100%',
+                    padding:      '0.65rem 1rem',
+                    borderRadius: 9,
+                    background:   'transparent',
+                    border:       '1.5px solid #16a34a',
+                    color:        '#15803d',
+                    fontWeight:   600,
+                    fontSize:     '0.9rem',
+                    cursor:       safeConfirming ? 'not-allowed' : 'pointer',
+                    opacity:      safeConfirming ? 0.7 : 1,
+                    display:      'flex',
+                    alignItems:   'center',
+                    justifyContent: 'center',
+                    gap:          '0.5rem',
+                    fontFamily:   'var(--cf-font-body)',
+                    transition:   'background 140ms',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!safeConfirming) e.currentTarget.style.background = '#f0fdf4';
+                  }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  {safeConfirming
+                    ? <><span style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(21,128,61,0.3)', borderTopColor: '#15803d', display: 'inline-block', animation: 'cf-spin 0.7s linear infinite' }} /> Sending…</>
+                    : <><i className="bi bi-shield-check" /> I'm Safe</>}
+                </button>
+                {safeError && (
+                  <p style={{ margin: '0.35rem 0 0', fontSize: '0.78rem', color: '#dc2626' }}>
+                    {safeError}
+                  </p>
+                )}
+              </>
             )}
           </div>
         )}

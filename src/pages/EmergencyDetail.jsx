@@ -25,6 +25,7 @@ import { useParams, useNavigate, Link }      from 'react-router-dom';
 import api                                   from '../services/api';
 import DashboardLayout                       from '../components/DashboardLayout';
 import LiveTrackingMap                       from '../components/LiveTrackingMap';
+import SessionMessagingPanel                  from '../components/SessionMessagingPanel';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -465,6 +466,19 @@ export default function EmergencyDetail() {
                 setLiveSession((prev) => prev ? { ...prev, status: newStatus } : prev)
               }
               onLocationUpdate={handleLocationUpdate}
+            />
+          )}
+
+          {/* ── Status Updates (admin → resident messaging) ──────────────────
+               Rendered whenever a live session exists (active or post-active).
+               The panel itself handles the active-vs-read-only switch so we
+               never need to unmount it on session end — the full message history
+               is still worth reviewing after tracking stops.                   */}
+          {liveSession && liveSessionDone && (
+            <SessionMessagingPanel
+              sessionId={liveSession._id}
+              sessionStatus={liveSession.status}
+              confirmedSafeAt={liveSession.reporterConfirmedSafeAt ?? null}
             />
           )}
 
