@@ -60,6 +60,69 @@ const STATUS_COLORS = {
 
 const VALID_STATUSES = ['Acknowledged', 'Escalated', 'Resolved', 'False Alarm'];
 
+// ── Route-link helpers ────────────────────────────────────────────────────────
+
+// Minimum locationTrail length before the "View Full Route" link is worth showing.
+// Fewer than this means the person barely moved, and a route is not meaningful.
+const MIN_TRAIL_POINTS = 3;
+
+// Maximum intermediate waypoints Google Maps accepts through the free URL scheme.
+const MAX_WAYPOINTS = 8;
+
+/**
+ * buildRouteUrl(trail, destination)
+ *
+ * Builds a Google Maps Directions URL that shows the full movement path from
+ * the first recorded ping to the most-recent known position (destination).
+ *
+ * Because a long session can have hundreds of trail points — far beyond what the
+ * Google Maps URL scheme accepts — the intermediate waypoints are downsampled to
+ * at most MAX_WAYPOINTS evenly-spaced points taken from trail[1..trail.length-2].
+ * The first ping is always the origin; destination (currentLocation) is always
+ * the endpoint.  The label "approximate path" in the UI reflects this trade-off.
+ *
+ * Returns null when there are too few points to form a meaningful route.
+ *
+ * @param {Array<{latitude:number,longitude:number}>} trail  — full locationTrail
+ * @param {{latitude:number,longitude:number}}        destination — currentLocation
+ * @returns {string|null}
+ */
+function buildRouteUrl(trail, destination) {
+  if (!trail || trail.length < MIN_TRAIL_POINTS || !destination) return null;
+
+  const origin = trail[0];
+
+  // Intermediate points: strip the first (= origin) and last (≈ destination)
+  // so they are not duplicated as waypoints.
+  const intermediates = trail.slice(1, -1);
+
+  // Downsample to at most MAX_WAYPOINTS evenly-spaced intermediate points.
+  let sampled = intermediates;
+  if (intermediates.length > MAX_WAYPOINTS) {
+    sampled = [];
+    for (let i = 0; i < MAX_WAYPOINTS; i++) {
+      // Map i → index in intermediates, spreading evenly from 0 to length-1.
+      const idx = Math.round(i * (intermediates.length - 1) / (MAX_WAYPOINTS - 1));
+      sampled.push(intermediates[idx]);
+    }
+  }
+
+  const fmt = (p) => `${p.latitude.toFixed(6)},${p.longitude.toFixed(6)}`;
+
+  const params = new URLSearchParams({
+    api:         '1',
+    origin:      fmt(origin),
+    destination: fmt(destination),
+    travelmode:  'driving',
+  });
+
+  if (sampled.length > 0) {
+    params.set('waypoints', sampled.map(fmt).join('|'));
+  }
+
+  return `https://www.google.com/maps/dir/?${params.toString()}`;
+}
+
 // ── Subcomponent: expandable media item ──────────────────────────────────────
 function MediaItem({ item, idx, onLightbox }) {
   if (item.type === 'image') {
@@ -128,10 +191,12 @@ export default function EmergencyDetail() {
   const [liveSession,     setLiveSession]     = useState(null);
   const [liveSessionDone, setLiveSessionDone] = useState(false); // true once polled
 
-  // Reactive live-location coordinates for "Open in Maps".
+  // Reactive live-location coordinates for "Open in Maps" and "View Full Route".
   // Seeded from liveSession.currentLocation on first resolution, then kept
   // up-to-date by onLocationUpdate fired by LiveTrackingMap on every poll.
-  // Shape: { latitude, longitude, accuracy?, lastPingAt? } | null
+  // Shape: { latitude, longitude, accuracy?, lastPingAt?, trail? } | null
+  //   trail — the full locationTrail array as of the last poll; used by
+  //            buildRouteUrl to construct the waypointed route link.
   const [liveTrackingPos, setLiveTrackingPos] = useState(null);
 
   // ── Fetch report ────────────────────────────────────────────────────────────
@@ -179,6 +244,7 @@ export default function EmergencyDetail() {
             longitude:   s.currentLocation.longitude,
             accuracy:    s.currentLocation.accuracy ?? null,
             lastPingAt:  s.lastPingAt ?? null,
+            trail:       s.locationTrail ?? [],
           });
         }
       })
@@ -197,6 +263,8 @@ export default function EmergencyDetail() {
         longitude:  sessionData.currentLocation.longitude,
         accuracy:   sessionData.currentLocation.accuracy ?? null,
         lastPingAt: sessionData.lastPingAt ?? null,
+        // Keep the full trail so buildRouteUrl always has the latest points.
+        trail:      sessionData.locationTrail ?? [],
       });
     }
   }, []);
@@ -620,15 +688,47 @@ export default function EmergencyDetail() {
                   )}
                 </div>
 
-                {/* Open in Maps — uses live coords, not report.location */}
-                <a
-                  href={`https://www.google.com/maps?q=${liveTrackingPos.latitude},${liveTrackingPos.longitude}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ fontSize: '0.8rem', color: 'var(--cf-primary)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.75rem' }}
-                >
-                  <i className="bi bi-map" /> Open in Maps
-                </a>
+                {/* Action links row */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', marginBottom: '0.75rem' }}>
+
+                  {/* Open in Maps — single pin at the current/last-known position */}
+                  <a
+                    href={`https://www.google.com/maps?q=${liveTrackingPos.latitude},${liveTrackingPos.longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ fontSize: '0.8rem', color: 'var(--cf-primary)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                  >
+                    <i className="bi bi-map" /> Open in Maps
+                  </a>
+
+                  {/* View Full Route — only shown when the trail has enough points
+                      to form a meaningful route (MIN_TRAIL_POINTS).  Uses
+                      buildRouteUrl to downsample the full locationTrail to at most
+                      MAX_WAYPOINTS intermediate points before building the URL, so
+                      the link stays within what Google Maps accepts for free.      */}
+                  {(() => {
+                    const routeUrl = buildRouteUrl(liveTrackingPos.trail, liveTrackingPos);
+                    return routeUrl ? (
+                      <a
+                        href={routeUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          fontSize: '0.8rem', fontWeight: 600,
+                          color: '#7c3aed',
+                          display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                        }}
+                      >
+                        <i className="bi bi-signpost-split" />
+                        View Full Route
+                        <span style={{ fontWeight: 400, color: 'var(--cf-text-muted)', fontSize: '0.72rem' }}>
+                          (approximate path)
+                        </span>
+                      </a>
+                    ) : null;
+                  })()}
+
+                </div>
 
                 {/* Divider + starting-point reference */}
                 {report.location?.address && (
