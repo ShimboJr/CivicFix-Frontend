@@ -70,6 +70,13 @@ const MIN_TRAIL_POINTS = 3;
 // Maximum intermediate waypoints Google Maps accepts through the free URL scheme.
 const MAX_WAYPOINTS = 8;
 
+// How often to silently re-fetch report fields during an active live session.
+// Intentionally offset from the location-ping (12 s) and message-poll (13 s)
+// intervals so all three pollers never fire simultaneously on the same tick.
+// Future note: if this page ever needs to be more efficient, a single combined
+// "active-session state" endpoint could replace all three separate loops.
+const REPORT_POLL_MS = 14_000;
+
 /**
  * buildRouteUrl(trail, destination)
  *
@@ -265,6 +272,36 @@ export default function EmergencyDetail() {
   }, [id]);
 
   useEffect(() => { fetchReport(); }, [fetchReport]);
+
+  // ── Silent report re-fetch — no loading-state change ──────────────────────
+  // Used exclusively by the polling loop below.  Unlike fetchReport(), this
+  // never sets `loading` to true, so the page never flashes a spinner on a
+  // background poll tick.  On any error it swallows silently — a transient
+  // network glitch must not wipe the currently-displayed data.
+  const silentRefetchReport = useCallback(async () => {
+    if (!id || id === 'null' || id === 'undefined') return;
+    try {
+      const { data } = await api.get(`/emergency-reports/${id}`);
+      setReport(data);
+    } catch {
+      // Network glitch — keep displaying last-good data.
+    }
+  }, [id]);
+
+  // ── Poll report fields while the linked live session is active ─────────────
+  // Only 'active' sessions can have mutable report fields (the resident can
+  // call PATCH /note / "Add details" at any time during the session).
+  // The moment liveSession.status transitions away from 'active' — via the
+  // onEnded callback on LiveTrackingMap — React re-runs this effect with the
+  // new status value, the early-return fires, and the stale interval is
+  // cleared by the cleanup function.  Nothing polls a static ended/expired
+  // session.
+  useEffect(() => {
+    if (liveSession?.status !== 'active') return;
+
+    const interval = setInterval(silentRefetchReport, REPORT_POLL_MS);
+    return () => clearInterval(interval);
+  }, [liveSession?.status, silentRefetchReport]);
 
   // ── Fetch linked live session once the report is loaded ─────────────────────
   // Returns any session (active, ended, or expired) linked to this report.
