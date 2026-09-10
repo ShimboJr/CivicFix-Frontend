@@ -26,9 +26,9 @@ import api from '../services/api';
 const PING_INTERVAL_MS    = 12_000;  // send a ping every 12 s (throttle)
 const TICK_INTERVAL_MS    = 1_000;   // UI clock update
 const MAX_TOTAL_MINUTES   = 8 * 60;  // absolute cap when extending (8 hours)
-// Message poll — intentionally a slightly different cadence from the ping
-// interval so they never fire simultaneously and compete on the same tick.
-const MESSAGE_POLL_MS     = 13_000;  // check for new admin messages every 13 s
+// NOTE: there is no separate message-poll constant — admin messages are
+// delivered as part of the ping response (newMessages field) so no extra
+// network call is needed after the one-shot backfill on mount.
 const EXTEND_OPTIONS = [
   { label: '+15 min', value: 15 },
   { label: '+1 hr', value: 60 },
@@ -112,12 +112,17 @@ export default function LiveLocationActive() {
   const [safeError,      setSafeError]      = useState('');
 
   // ── Refs — used inside closures to avoid stale-state issues ───────────────
-  const activeRef       = useRef(true);    // set to false on unmount/stop/expire
-  const watchIdRef      = useRef(null);    // geolocation.watchPosition id
-  const latestPosRef    = useRef(null);    // the most recent position from watchPosition
-  const pingTimerRef    = useRef(null);    // setInterval id for throttled pings
-  const msgPollTimerRef = useRef(null);    // setInterval id for message polling
-  const expiresAtRef    = useRef(expiresAt);
+  const activeRef           = useRef(true);    // set to false on unmount/stop/expire
+  const watchIdRef          = useRef(null);    // geolocation.watchPosition id
+  const latestPosRef        = useRef(null);    // the most recent position from watchPosition
+  const pingTimerRef        = useRef(null);    // setInterval id for throttled pings
+  const expiresAtRef        = useRef(expiresAt);
+  // Tracks createdAt of the most-recently-displayed admin message.
+  // Stored as a ref (not state) so sendPing always reads the current value
+  // without needing it in its dependency array.
+  // Advanced ONLY after a message is successfully merged into state, so a
+  // dropped/failed ping never causes a message to be silently lost.
+  const lastSeenMessageAtRef = useRef(null);
 
   // Keep expiresAtRef in sync with state
   useEffect(() => { expiresAtRef.current = expiresAt; }, [expiresAt]);
@@ -172,13 +177,27 @@ export default function LiveLocationActive() {
   // Pragmatic decision: sendBeacon is used for its resilience to tab-close;
   // normal fetch is the primary path during active use, which gives us
   // proper error handling and response inspection.
+  //
+  // Message piggybacking:
+  //   We include lastSeenMessageAt in every ping body.  The server responds
+  //   with newMessages — any admin messages created after that timestamp.
+  //   We merge them into state and THEN advance lastSeenMessageAtRef.
+  //   Advancing the ref only after a successful render means a dropped ping
+  //   never silently loses a message — the next successful ping re-delivers it.
   const sendPing = useCallback(async (pos) => {
     if (!activeRef.current) return;
     if (!pos) return;
 
     const { latitude, longitude, accuracy } = pos.coords;
     const url = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/live-location/${id}/ping`;
-    const payload = JSON.stringify({ latitude, longitude, accuracy });
+    const payload = JSON.stringify({
+      latitude,
+      longitude,
+      accuracy,
+      // May be null on the very first ping (before any message has been seen).
+      // The server treats null/absent as "return all messages for this session".
+      lastSeenMessageAt: lastSeenMessageAtRef.current,
+    });
     const token = getToken();
 
     // Primary path: regular fetch with auth header (gives error feedback)
@@ -209,12 +228,51 @@ export default function LiveLocationActive() {
         const json = await res.json().catch(() => ({}));
         setPingError(json.message || `Ping failed (${res.status})`);
       } else {
+        const json = await res.json().catch(() => ({}));
         setPingError('');
         setPingCount((c) => c + 1);
         setLastPingAt(new Date());
+
+        // ── Merge any new admin messages from the ping response ───────────
+        // ⚠️  SILENT BY DESIGN — no sound, badge, or OS alert.
+        // New messages become visible only via this panel re-rendering.
+        const incoming = json.newMessages ?? [];
+        if (incoming.length > 0) {
+          setSeenMsgIds((prev) => {
+            const newIds = incoming
+              .map((m) => m._id)
+              .filter((mid) => !prev.has(mid));
+            if (!newIds.length) return prev; // nothing actually new — bail
+
+            // Soft-highlight the newest message (fades after 8 s; no sound).
+            const latestMsg = incoming[incoming.length - 1];
+            setNewestMsgId(latestMsg._id);
+            setTimeout(() => setNewestMsgId(null), 8_000);
+
+            // Merge into the displayed list (existing + new, deduped by _id)
+            setMessages((prev) => {
+              const existingIds = new Set(prev.map((m) => m._id));
+              const truly_new = incoming.filter((m) => !existingIds.has(m._id));
+              if (!truly_new.length) return prev;
+              const merged = [...prev, ...truly_new].sort(
+                (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+              );
+
+              // Advance the cursor ONLY after the new messages are in state.
+              // If this callback is called, rendering will happen — safe to advance.
+              lastSeenMessageAtRef.current = latestMsg.createdAt;
+
+              return merged;
+            });
+
+            return new Set([...prev, ...newIds]);
+          });
+        }
       }
     } catch {
-      // Network failure — queue a beacon as a best-effort backup
+      // Network failure — queue a beacon as a best-effort backup.
+      // lastSeenMessageAtRef is NOT advanced here — the messages are not yet
+      // confirmed delivered, so they will be re-fetched on the next ping.
       if (navigator.sendBeacon) {
         navigator.sendBeacon(url, new Blob([payload], { type: 'application/json' }));
       }
@@ -222,7 +280,8 @@ export default function LiveLocationActive() {
     }
   }, [id]);
 
-  // ── teardown — stops watchPosition, the ping interval, and the msg poll ──
+  // ── teardown — stops watchPosition and the ping interval ────────────────
+  // (message delivery now piggybacked on ping — no separate interval to clear)
   const teardown = useCallback(() => {
     activeRef.current = false;
     if (watchIdRef.current != null) {
@@ -232,10 +291,6 @@ export default function LiveLocationActive() {
     if (pingTimerRef.current != null) {
       clearInterval(pingTimerRef.current);
       pingTimerRef.current = null;
-    }
-    if (msgPollTimerRef.current != null) {
-      clearInterval(msgPollTimerRef.current);
-      msgPollTimerRef.current = null;
     }
   }, []);
 
@@ -325,57 +380,49 @@ export default function LiveLocationActive() {
     setExtendLoading(false);
   }, [startedAt]);
 
-  // ── Message polling — separate loop from the ping interval ─────────────────
+  // ── One-shot message backfill on mount ────────────────────────────────────
+  // Covers the gap between session start and first page load: if an admin sent
+  // a message before the resident opened this page, it is fetched here so the
+  // panel is populated immediately rather than waiting for the first ping.
+  //
+  // From this point forward, admin messages arrive via the ping response
+  // (newMessages field) — no separate polling interval is needed.
+  //
   // ⚠️  SILENT BY DESIGN:
-  //   This loop must NEVER trigger a sound, browser notification, badge update,
+  //   This call must NEVER trigger a sound, browser notification, badge update,
   //   or any OS-level alert.  New messages become visible only because the panel
   //   re-renders with new content — discoverable only when the resident is
   //   already looking at the screen.  This is a deliberate safety property.
   useEffect(() => {
     if (sessionStatus !== 'active') return;
 
-    const poll = async () => {
+    const backfill = async () => {
       if (!activeRef.current) return;
       try {
         const { data } = await api.get(`/live-location/${id}/messages`);
         const incoming = data.messages ?? [];
         if (!incoming.length) return;
 
-        // Only update state when there are actually new messages so we avoid
-        // spurious re-renders on polls that return the same list.
-        const incomingIds = new Set(incoming.map((m) => m._id));
-        setSeenMsgIds((prev) => {
-          // Find any id not yet in our seen set
-          const newIds = [...incomingIds].filter((mid) => !prev.has(mid));
-          if (!newIds.length) return prev; // nothing new — bail out early
+        // Populate messages state and advance the cursor so the first ping
+        // only fetches messages newer than what we already have.
+        setMessages(incoming);
+        setSeenMsgIds(new Set(incoming.map((m) => m._id)));
 
-          // Soft-highlight the newest: briefly set newestMsgId, clear after 8 s.
-          // 8 s is long enough for the resident to notice if looking at the screen,
-          // but short enough that a threat actor glancing over won't see a
-          // lingering visual cue for long.
-          const latestMsg = incoming[incoming.length - 1];
-          setNewestMsgId(latestMsg._id);
-          setTimeout(() => setNewestMsgId(null), 8_000);
+        const latestMsg = incoming[incoming.length - 1];
+        setNewestMsgId(latestMsg._id);
+        setTimeout(() => setNewestMsgId(null), 8_000);
 
-          setMessages(incoming);
-          return incomingIds; // replace the whole set rather than merging
-        });
+        // Advance the ref AFTER populating state so pings skip these messages.
+        lastSeenMessageAtRef.current = latestMsg.createdAt;
       } catch {
-        // Network glitch — swallow silently; will retry on the next interval.
-        // Do NOT show an error UI here — that would draw attention to the phone.
+        // Non-fatal — swallow silently; the first ping will backfill instead.
+        // Do NOT show an error UI — that would draw attention to the phone.
       }
     };
 
-    // Run immediately on mount to pick up any messages sent before this page load
-    poll();
-    msgPollTimerRef.current = setInterval(poll, MESSAGE_POLL_MS);
-
-    return () => {
-      if (msgPollTimerRef.current != null) {
-        clearInterval(msgPollTimerRef.current);
-        msgPollTimerRef.current = null;
-      }
-    };
+    backfill();
+    // Run once on mount (or if sessionStatus flips back to active, which
+    // doesn't happen in practice — included for correctness).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, sessionStatus]);
 
