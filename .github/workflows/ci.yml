@@ -97,41 +97,93 @@ jobs:
       - name: Build for production (Vercel)
         run: vercel build --prod --token=$VERCEL_TOKEN
 
-      # Deploy the pre-built output.  --prebuilt skips a second build on
-      # Vercel's side, making deployments faster and fully reproducible.
-      # We capture stdout so the health-check step can use the canonical URL.
+      # Deploy the pre-built output to production and capture the deployment URL.
+      #
+      # CRITICAL — stdout and stderr MUST be kept separate:
+      #   Per Vercel CLI documentation, stdout from `vercel deploy` is always
+      #   exactly the deployment URL and nothing else.  Progress/status messages
+      #   go to stderr.  Merging them (e.g. with 2>&1) or piping them through a
+      #   combined stream (tee, grep, tail) causes status fragments like
+      #   "Building…" to concatenate directly onto the URL, producing a malformed
+      #   value that silently breaks the health-check curl downstream.
+      #
+      #   Correct pattern (mirrors the backend workflow):
+      #     stdout → captured by $(...) → clean URL
+      #     stderr → separate file     → never enters the URL variable
       - name: Deploy pre-built output
         id: vercel_deploy
         run: |
-          DEPLOY_URL=$(vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN 2>&1 | tee /dev/stderr | grep -E '^https://' | tail -1)
+          DEPLOY_URL=$(vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN \
+            2> deploy-error.txt)
+          # Echo stderr to the Actions log so any warnings remain visible
+          if [ -s deploy-error.txt ]; then
+            echo "--- Vercel CLI stderr ---"
+            cat deploy-error.txt
+            echo "------------------------"
+          fi
+          # Trim any trailing whitespace/newline the shell may leave
+          DEPLOY_URL="${DEPLOY_URL%%[[:space:]]}"
           echo "url=${DEPLOY_URL}" >> "$GITHUB_OUTPUT"
 
-      # ── Post-deploy health check ─────────────────────────────────────────────
+      # ── URL validation ────────────────────────────────────────────────────────
+      # Fail fast with a clear message if the captured URL is malformed.
+      # This catches any future regression (e.g. a CLI update that changes output
+      # behaviour) before a bad value silently reaches curl and causes a confusing
+      # indirect failure.
+      - name: Validate deployment URL
+        env:
+          DEPLOY_URL: ${{ steps.vercel_deploy.outputs.url }}
+        run: |
+          echo "Captured deployment URL: '${DEPLOY_URL}'"
+          # Must start with https://, contain no spaces, and have no trailing text
+          # beyond a valid hostname/path (no embedded status words like "Building…")
+          if ! echo "${DEPLOY_URL}" | grep -qE '^https://[^ ]+$'; then
+            echo "❌  Deployment URL is malformed: '${DEPLOY_URL}'"
+            echo "    Expected a bare https:// URL with no spaces or trailing text."
+            echo "    Check the 'Deploy pre-built output' step log for stderr output"
+            echo "    from the Vercel CLI that may have merged into the URL."
+            exit 1
+          fi
+          echo "✅  URL looks well-formed."
+
+      # ── Post-deploy health check ──────────────────────────────────────────────
       # This is a second, independent safety net.  CI passing guarantees the
       # *code* was correct at test time, but doesn't guarantee the deployed
       # function won't fail for a runtime-only reason (bad env var, missing
       # secret, broken edge config, etc.) that CI's environment didn't expose.
       #
-      # Strategy: retry up to 3 times with a 10-second back-off to absorb
-      # Vercel's propagation delay, then assert the HTTP status is not 5xx.
-      # A 200 (the SPA's index.html) is the expected healthy response.
+      # Strategy: retry up to 6 times with a 10-second back-off to absorb
+      # Vercel's edge propagation delay.  Anything 2xx/3xx/4xx is "alive";
+      # only 5xx or an unreachable host fails the workflow.
       - name: Post-deploy health check
         env:
           DEPLOY_URL: ${{ steps.vercel_deploy.outputs.url }}
         run: |
-          echo "🔍  Health-checking: ${DEPLOY_URL}"
-          for attempt in 1 2 3; do
+          echo "Running health check against ${DEPLOY_URL}"
+          for i in 1 2 3 4 5 6; do
             HTTP_STATUS=$(curl --silent --output /dev/null --write-out "%{http_code}" \
-              --max-time 20 --retry 2 --retry-delay 5 "${DEPLOY_URL}")
-            echo "  Attempt ${attempt}: HTTP ${HTTP_STATUS}"
-            if [ "${HTTP_STATUS}" -lt 500 ] 2>/dev/null && [ "${HTTP_STATUS}" -ge 200 ] 2>/dev/null; then
-              echo "✅  Health check passed (HTTP ${HTTP_STATUS})"
+              --max-time 15 "${DEPLOY_URL}" || echo "000")
+            echo "Attempt ${i}: HTTP ${HTTP_STATUS}"
+            if [ "$HTTP_STATUS" -ge 500 ] 2>/dev/null; then
+              echo "Server returned ${HTTP_STATUS} — deployment is unhealthy."
+              if [ "$i" -lt 6 ]; then
+                echo "Retrying in 10 s..."
+                sleep 10
+              else
+                echo "Health check failed after 6 attempts. Failing workflow."
+                exit 1
+              fi
+            elif [ "$HTTP_STATUS" = "000" ]; then
+              echo "Could not reach the deployment endpoint."
+              if [ "$i" -lt 6 ]; then
+                echo "Retrying in 10 s..."
+                sleep 10
+              else
+                echo "Health check failed after 6 attempts. Failing workflow."
+                exit 1
+              fi
+            else
+              echo "✅  Health check passed (HTTP ${HTTP_STATUS})."
               exit 0
             fi
-            echo "  Not healthy yet — waiting 10 s before retry…"
-            sleep 10
           done
-          echo "❌  Health check failed — production returned HTTP ${HTTP_STATUS} after 3 attempts."
-          echo "    Deployment URL: ${DEPLOY_URL}"
-          echo "    Investigate the Vercel dashboard for runtime errors."
-          exit 1
