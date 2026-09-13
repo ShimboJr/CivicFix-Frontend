@@ -26,6 +26,10 @@ The frontend provides an intuitive interface for **Residents, Staff, and Adminis
 - Track submitted reports
 - Receive notifications
 - Submit private emergency reports
+- Activate live location sharing during personal-safety emergencies
+- Share real-time location updates with authorized administrators
+- View live location session status and movement history
+- Send an “I'm Safe” confirmation without automatically ending location tracking
 
 ### 👨‍💼 Administrators
 
@@ -78,6 +82,35 @@ The frontend provides an intuitive interface for **Residents, Staff, and Adminis
 
 ![Emergency Reporting](./screenshots/emergency-report.jpg)
 
+### 📍 Live Location Sharing
+
+During a personal-safety emergency, residents can activate live location sharing so authorized administrators can monitor their current location and movement history.
+
+![Live Location Sharing](./screenshots/live-location-sharing.jpg)
+
+---
+
+## 📍 Live Location Sharing
+
+CivicFix includes a dedicated live location sharing feature for personal-safety emergencies. It allows a resident to share their current GPS position with authorized administrators while the session remains active.
+
+### How It Works
+
+1. **Activate Live Location Sharing** — The resident starts a live location session and provides their initial GPS coordinates.
+2. **Private Emergency Report** — CivicFix automatically creates a private **Live Location SOS** emergency report linked to the session.
+3. **Administrator Alert** — Authorized administrators are notified through the existing emergency notification workflow.
+4. **Location Updates** — The resident's device periodically sends location pings containing latitude, longitude, and optional accuracy information.
+5. **Movement History** — Location updates are retained as a location trail so administrators can review the resident's movement history.
+6. **Session Expiry or End** — A session can expire automatically based on its configured duration or be explicitly ended.
+7. **Administrator Messages** — Administrators can send messages to the resident during a session. These messages are retrieved by the resident client rather than sent as push/system notifications.
+8. **“I'm Safe” Confirmation** — The resident can confirm that they are safe. This records the confirmation and notifies administrators, but **does not automatically stop location tracking**.
+
+### Privacy and Access
+
+Live location data is handled as private emergency information. The frontend uses the backend API's role and ownership controls so that live location sessions and session messages are only available to authorized users.
+
+For the complete endpoint definitions, request/response formats, permissions, and data models, see the [CivicFix API Documentation](https://github.com/ShimboJr/CivicFix-Backend/blob/main/docs/API_DOCUMENTATION.md).
+
 ---
 
 ## 🛠️ Technology Stack
@@ -95,7 +128,7 @@ The frontend provides an intuitive interface for **Residents, Staff, and Adminis
 
 ## 🔌 Backend API Integration
 
-The CivicFix frontend communicates with the CivicFix REST API for authentication, issue management, user management, notifications, emergency reporting, and other application functionality.
+The CivicFix frontend communicates with the CivicFix REST API for authentication, issue management, user management, notifications, emergency reporting, live location sharing, and other application functionality.
 
 **Backend Repository:**  
 [CivicFix Backend](https://github.com/ShimboJr/CivicFix-Backend)
@@ -164,6 +197,7 @@ CivicFix was developed to:
 - Provide transparency throughout the issue-resolution process.
 - Allow residents to track the progress of their reports.
 - Encourage community participation in identifying local problems.
+- Provide a private personal-safety mechanism through live location sharing.
 
 ---
 
@@ -172,10 +206,10 @@ CivicFix was developed to:
 Potential future enhancements include:
 
 - Real-time issue updates
-- Interactive geographical maps
+- More advanced real-time geographical map experiences
 - AI-assisted issue categorization
 - Advanced duplicate issue detection
-- Native mobile applications
+- Deeper background location support through native mobile applications
 - Government and emergency service integrations
 - SMS notifications
 - Multi-language support
