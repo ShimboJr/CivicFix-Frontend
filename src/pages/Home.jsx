@@ -18,7 +18,7 @@ function formatStat(n) {
 
 // Static fallback values shown while the real data loads (avoids a zero-flash).
 const FALLBACK = {
-  totalIssues:    '2,400+',
+  totalIssues: '2,400+',
   resolvedIssues: '1,800+',
   activeCitizens: '12,000+',
 };
@@ -46,13 +46,13 @@ export default function Home() {
   // Build the three display values: use real (formatted) data once loaded,
   // otherwise keep the static fallback so nothing flashes blank or zero.
   const display = {
-    totalIssues:    stats ? formatStat(stats.totalIssues)    : FALLBACK.totalIssues,
+    totalIssues: stats ? formatStat(stats.totalIssues) : FALLBACK.totalIssues,
     resolvedIssues: stats ? formatStat(stats.resolvedIssues) : FALLBACK.resolvedIssues,
     activeCitizens: stats ? formatStat(stats.activeCitizens) : FALLBACK.activeCitizens,
   };
 
   const statItems = [
-    { label: 'Issues Reported', value: display.totalIssues    },
+    { label: 'Issues Reported', value: display.totalIssues },
     { label: 'Issues Resolved', value: display.resolvedIssues },
     { label: 'Active Citizens', value: display.activeCitizens },
   ];
@@ -75,7 +75,7 @@ export default function Home() {
 
         <h1 style={{ fontSize: 'clamp(2rem, 5vw, 2.75rem)', lineHeight: 1.2, marginBottom: '1rem' }}>
           Your Community.<br />
-          <span style={{ color: 'var(--cf-primary)' }}>Your Voice.</span> Fixed.
+          <span style={{ color: 'var(--cf-primary)' }}>Your Voice.</span> Fix.
         </h1>
 
         <p style={{ color: 'var(--cf-text-secondary)', fontSize: '1.05rem', lineHeight: 1.7, marginBottom: '2rem' }}>
