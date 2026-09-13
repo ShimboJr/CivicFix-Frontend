@@ -7,7 +7,7 @@
  * the LiveLocationActive page itself (the page has its own full-screen UI).
  *
  * Interaction model — exactly two taps to activate:
- *   Tap 1 → opens a small confirm panel (no navigation, no form)
+ *   Tap 1 →opens a small confirm panel (no navigation, no form)
  *   Tap 2 → "Share My Location" button triggers geolocation + API call
  *
  * The component is self-contained; it holds no server state.  The caller
@@ -32,121 +32,121 @@ const DURATION_OPTIONS = [
 const S = {
   // The pulsing red FAB itself
   fab: {
-    position:       'fixed',
-    bottom:         '1.5rem',
-    right:          '1.5rem',
-    zIndex:         1060,          // above DashboardLayout's 1045 drawer
-    width:          56,
-    height:         56,
-    borderRadius:   '50%',
-    background:     'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
-    border:         '3px solid rgba(255,255,255,0.35)',
-    boxShadow:      '0 4px 18px rgba(220,38,38,0.55), 0 2px 6px rgba(0,0,0,0.3)',
-    color:          '#fff',
-    fontSize:       '1.35rem',
-    cursor:         'pointer',
-    display:        'flex',
-    alignItems:     'center',
+    position: 'fixed',
+    bottom: '1.5rem',
+    right: '1.5rem',
+    zIndex: 1060,          // above DashboardLayout's 1045 drawer
+    width: 56,
+    height: 56,
+    borderRadius: '50%',
+    background: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
+    border: '3px solid rgba(255,255,255,0.35)',
+    boxShadow: '0 4px 18px rgba(220,38,38,0.55), 0 2px 6px rgba(0,0,0,0.3)',
+    color: '#fff',
+    fontSize: '1.35rem',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
     justifyContent: 'center',
-    transition:     'transform 140ms, box-shadow 140ms',
+    transition: 'transform 140ms, box-shadow 140ms',
     // Animation defined inline via keyframe injection below
   },
 
   // Confirm panel — sits just above the FAB
   panel: {
-    position:     'fixed',
-    bottom:       '5rem',
-    right:        '1.5rem',
-    zIndex:       1059,
-    width:        300,
-    background:   '#fff',
+    position: 'fixed',
+    bottom: '5rem',
+    right: '1.5rem',
+    zIndex: 1059,
+    width: 300,
+    background: '#fff',
     borderRadius: 14,
-    boxShadow:    '0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.1)',
-    border:       '1px solid rgba(220,38,38,0.15)',
-    padding:      '1.1rem 1.2rem',
-    animation:    'sos-slide-up 180ms cubic-bezier(0.4,0,0.2,1)',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.1)',
+    border: '1px solid rgba(220,38,38,0.15)',
+    padding: '1.1rem 1.2rem',
+    animation: 'sos-slide-up 180ms cubic-bezier(0.4,0,0.2,1)',
   },
 
   panelHeader: {
-    display:      'flex',
-    alignItems:   'center',
-    gap:          '0.5rem',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
     marginBottom: '0.6rem',
   },
 
   panelTitle: {
-    fontFamily:  'var(--cf-font-heading)',
-    fontWeight:  700,
-    fontSize:    '0.9375rem',
-    color:       '#dc2626',
-    margin:      0,
+    fontFamily: 'var(--cf-font-heading)',
+    fontWeight: 700,
+    fontSize: '0.9375rem',
+    color: '#dc2626',
+    margin: 0,
   },
 
   panelDesc: {
-    fontSize:    '0.8125rem',
-    color:       'var(--cf-text-secondary)',
-    lineHeight:  1.5,
-    margin:      '0 0 0.9rem',
+    fontSize: '0.8125rem',
+    color: 'var(--cf-text-secondary)',
+    lineHeight: 1.5,
+    margin: '0 0 0.9rem',
   },
 
   durationRow: {
-    display:        'flex',
-    gap:            '0.45rem',
-    marginBottom:   '0.85rem',
+    display: 'flex',
+    gap: '0.45rem',
+    marginBottom: '0.85rem',
   },
 
   durationBtn: (selected) => ({
-    flex:         1,
-    padding:      '0.4rem 0',
+    flex: 1,
+    padding: '0.4rem 0',
     borderRadius: 7,
-    border:       selected ? '2px solid #dc2626' : '1.5px solid #e5e7eb',
-    background:   selected ? '#fee2e2' : '#f9fafb',
-    color:        selected ? '#dc2626' : 'var(--cf-text-secondary)',
-    fontWeight:   selected ? 700 : 500,
-    fontSize:     '0.8rem',
-    cursor:       'pointer',
-    transition:   'all 120ms',
+    border: selected ? '2px solid #dc2626' : '1.5px solid #e5e7eb',
+    background: selected ? '#fee2e2' : '#f9fafb',
+    color: selected ? '#dc2626' : 'var(--cf-text-secondary)',
+    fontWeight: selected ? 700 : 500,
+    fontSize: '0.8rem',
+    cursor: 'pointer',
+    transition: 'all 120ms',
   }),
 
   shareBtn: {
-    width:          '100%',
-    padding:        '0.65rem',
-    borderRadius:   9,
-    background:     'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
-    border:         'none',
-    color:          '#fff',
-    fontWeight:     700,
-    fontSize:       '0.9375rem',
-    cursor:         'pointer',
-    display:        'flex',
-    alignItems:     'center',
+    width: '100%',
+    padding: '0.65rem',
+    borderRadius: 9,
+    background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+    border: 'none',
+    color: '#fff',
+    fontWeight: 700,
+    fontSize: '0.9375rem',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
     justifyContent: 'center',
-    gap:            '0.45rem',
-    transition:     'opacity 140ms',
-    fontFamily:     'var(--cf-font-body)',
+    gap: '0.45rem',
+    transition: 'opacity 140ms',
+    fontFamily: 'var(--cf-font-body)',
   },
 
   errorMsg: {
-    marginTop:   '0.6rem',
-    fontSize:    '0.78rem',
-    color:       '#b91c1c',
-    background:  '#fee2e2',
+    marginTop: '0.6rem',
+    fontSize: '0.78rem',
+    color: '#b91c1c',
+    background: '#fee2e2',
     borderRadius: 6,
-    padding:     '0.4rem 0.6rem',
-    display:     'flex',
-    gap:         '0.35rem',
-    alignItems:  'flex-start',
+    padding: '0.4rem 0.6rem',
+    display: 'flex',
+    gap: '0.35rem',
+    alignItems: 'flex-start',
   },
 
   closeBtn: {
-    marginLeft:  'auto',
-    background:  'none',
-    border:      'none',
-    cursor:      'pointer',
-    color:       'var(--cf-text-muted)',
-    padding:     '0.1rem',
-    lineHeight:  1,
-    fontSize:    '0.9rem',
+    marginLeft: 'auto',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    color: 'var(--cf-text-muted)',
+    padding: '0.1rem',
+    lineHeight: 1,
+    fontSize: '0.9rem',
   },
 };
 
@@ -168,14 +168,14 @@ if (typeof document !== 'undefined' && !document.getElementById('sos-keyframes')
 }
 
 export default function SOSButton() {
-  const { user }      = useAuth();
-  const navigate      = useNavigate();
-  const location      = useLocation();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const [open,     setOpen]     = useState(false);
+  const [open, setOpen] = useState(false);
   const [duration, setDuration] = useState(60);      // minutes, default 1 hr
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   // Track whether the user has already pressed share once (prevents double-submit)
   const submittingRef = useRef(false);
@@ -206,8 +206,8 @@ export default function SOSButton() {
       position = await new Promise((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true,
-          timeout:            10_000,
-          maximumAge:         0,
+          timeout: 10_000,
+          maximumAge: 0,
         });
       });
     } catch (geoErr) {
