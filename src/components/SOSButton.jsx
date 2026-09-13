@@ -180,13 +180,9 @@ export default function SOSButton() {
   // Track whether the user has already pressed share once (prevents double-submit)
   const submittingRef = useRef(false);
 
-  // ── Hide conditions ────────────────────────────────────────────────────────
-  // 1. Only residents have live-location sharing
-  // 2. Don't show the FAB while already on the active-sharing page
-  if (user?.role !== 'resident') return null;
-  if (location.pathname.startsWith('/dashboard/live-location')) return null;
-
   // ── Handlers ───────────────────────────────────────────────────────────────
+  // IMPORTANT: All useCallback hooks MUST be declared before any early return
+  // so that React's Rules of Hooks are satisfied on every render path.
 
   const handleFabClick = useCallback(() => {
     setError('');
@@ -250,6 +246,13 @@ export default function SOSButton() {
       submittingRef.current = false;
     }
   }, [duration, navigate]);
+
+  // ── Hide conditions ────────────────────────────────────────────────────────
+  // 1. Only residents have live-location sharing
+  // 2. Don't show the FAB while already on the active-sharing page
+  // These early returns are placed AFTER all hooks to satisfy Rules of Hooks.
+  if (user?.role !== 'resident') return null;
+  if (location.pathname.startsWith('/dashboard/live-location')) return null;
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
