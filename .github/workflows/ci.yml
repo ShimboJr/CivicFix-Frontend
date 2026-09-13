@@ -1,6 +1,18 @@
 # .github/workflows/ci.yml  (CivicFix-Frontend)
 #
-# Runs oxlint and a Vite production build on every push and pull_request to main.
+# Two-job pipeline:
+#
+#   frontend  — Lint (oxlint) + Vite production build.
+#               Runs on every push and pull_request to main.
+#               This is the code-correctness gate.
+#
+#   deploy    — Deploys to Vercel production via the CLI.
+#               Only runs when `frontend` passes AND the event is a direct
+#               push to main (never on pull requests).
+#               A post-deploy health check provides a second, independent
+#               safety net: CI passing means the code was correct at test
+#               time, but this confirms the deployed function actually
+#               responds before the job is marked green.
 #
 # NOTE — monorepo context:
 #   The backend lives in a separate repository (CivicFix-Backend) and has its
@@ -15,6 +27,7 @@ on:
     branches: [main]
 
 jobs:
+  # ── Job 1: Lint + Build ──────────────────────────────────────────────────────
   frontend:
     name: Lint + Build
     runs-on: ubuntu-latest
@@ -35,7 +48,8 @@ jobs:
 
       - name: Lint
         # Runs oxlint via the "lint" script in package.json
-        # (configured in .oxlintrc.json — enforces React hooks rules)
+        # (configured in .oxlintrc.json — enforces React hooks rules).
+        # oxlint exits non-zero on any error, blocking everything downstream.
         run: npm run lint
 
       - name: Build
@@ -48,3 +62,76 @@ jobs:
           # but the value doesn't need to be a real server for a build-only check.
           VITE_API_URL: https://placeholder-for-ci-build-only.example.com/api
         run: npm run build
+
+  # ── Job 2: Deploy to Vercel production ──────────────────────────────────────
+  deploy:
+    name: Deploy → Vercel (production)
+    runs-on: ubuntu-latest
+
+    # Hard gate: this job is skipped entirely (not just "failed") when the
+    # lint/build job fails — Vercel never sees a broken commit.
+    needs: [frontend]
+
+    # Only deploy on a direct push to main.  Pull-request runs are excluded so
+    # preview/review workflows don't accidentally write to production.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    env:
+      VERCEL_TOKEN:      ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      # Pull remote Vercel project settings and env vars into .vercel/
+      - name: Pull Vercel project settings
+        run: vercel pull --yes --environment=production --token=$VERCEL_TOKEN
+
+      # Build the production bundle using Vercel's build pipeline.
+      # This generates the .vercel/output/ directory consumed by the next step.
+      - name: Build for production (Vercel)
+        run: vercel build --prod --token=$VERCEL_TOKEN
+
+      # Deploy the pre-built output.  --prebuilt skips a second build on
+      # Vercel's side, making deployments faster and fully reproducible.
+      # We capture stdout so the health-check step can use the canonical URL.
+      - name: Deploy pre-built output
+        id: vercel_deploy
+        run: |
+          DEPLOY_URL=$(vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN 2>&1 | tee /dev/stderr | grep -E '^https://' | tail -1)
+          echo "url=${DEPLOY_URL}" >> "$GITHUB_OUTPUT"
+
+      # ── Post-deploy health check ─────────────────────────────────────────────
+      # This is a second, independent safety net.  CI passing guarantees the
+      # *code* was correct at test time, but doesn't guarantee the deployed
+      # function won't fail for a runtime-only reason (bad env var, missing
+      # secret, broken edge config, etc.) that CI's environment didn't expose.
+      #
+      # Strategy: retry up to 3 times with a 10-second back-off to absorb
+      # Vercel's propagation delay, then assert the HTTP status is not 5xx.
+      # A 200 (the SPA's index.html) is the expected healthy response.
+      - name: Post-deploy health check
+        env:
+          DEPLOY_URL: ${{ steps.vercel_deploy.outputs.url }}
+        run: |
+          echo "🔍  Health-checking: ${DEPLOY_URL}"
+          for attempt in 1 2 3; do
+            HTTP_STATUS=$(curl --silent --output /dev/null --write-out "%{http_code}" \
+              --max-time 20 --retry 2 --retry-delay 5 "${DEPLOY_URL}")
+            echo "  Attempt ${attempt}: HTTP ${HTTP_STATUS}"
+            if [ "${HTTP_STATUS}" -lt 500 ] 2>/dev/null && [ "${HTTP_STATUS}" -ge 200 ] 2>/dev/null; then
+              echo "✅  Health check passed (HTTP ${HTTP_STATUS})"
+              exit 0
+            fi
+            echo "  Not healthy yet — waiting 10 s before retry…"
+            sleep 10
+          done
+          echo "❌  Health check failed — production returned HTTP ${HTTP_STATUS} after 3 attempts."
+          echo "    Deployment URL: ${DEPLOY_URL}"
+          echo "    Investigate the Vercel dashboard for runtime errors."
+          exit 1
