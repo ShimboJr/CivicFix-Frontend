@@ -75,7 +75,7 @@ export default function Home() {
 
         <h1 style={{ fontSize: 'clamp(2rem, 5vw, 2.75rem)', lineHeight: 1.2, marginBottom: '1rem' }}>
           Your Community.<br />
-          <span style={{ color: 'var(--cf-primary)' }}>Your Voice.</span> Fix.
+          <span style={{ color: 'var(--cf-primary)' }}>Your Voice.</span> Fixe.
         </h1>
 
         <p style={{ color: 'var(--cf-text-secondary)', fontSize: '1.05rem', lineHeight: 1.7, marginBottom: '2rem' }}>

@@ -6,13 +6,30 @@
 #               Runs on every push and pull_request to main.
 #               This is the code-correctness gate.
 #
-#   deploy    — Deploys to Vercel production via the CLI.
+#   deploy    — Four-step Vercel production pipeline:
 #               Only runs when `frontend` passes AND the event is a direct
 #               push to main (never on pull requests).
-#               A post-deploy health check provides a second, independent
-#               safety net: CI passing means the code was correct at test
-#               time, but this confirms the deployed function actually
-#               responds before the job is marked green.
+#
+#               1. vercel pull / build / deploy --prebuilt --prod
+#                  Creates a real Vercel deployment with its own unique URL
+#                  (NEW_DEPLOYMENT_URL). "Auto-assign Custom Production Domains"
+#                  is disabled in the Vercel project, so this URL is NOT yet
+#                  what the custom domain (sjr-civicfix.vercel.app) serves.
+#
+#               2. Health check against NEW_DEPLOYMENT_URL
+#                  Confirms the new build actually responds before any
+#                  promotion happens.  A broken build never reaches step 3.
+#
+#               3. vercel promote NEW_DEPLOYMENT_URL
+#                  Explicitly aliases the custom production domain to this
+#                  deployment.  Required because Vercel's auto-assignment is
+#                  disabled — without this step the custom domain would keep
+#                  serving the previous deployment regardless of step 1.
+#
+#               4. Post-promotion domain check
+#                  A curl against sjr-civicfix.vercel.app confirms the live
+#                  domain is now serving the new build, not just that the
+#                  promote command exited successfully.
 #
 # NOTE — monorepo context:
 #   The backend lives in a separate repository (CivicFix-Backend) and has its
@@ -99,6 +116,11 @@ jobs:
 
       # Deploy the pre-built output to production and capture the deployment URL.
       #
+      # This creates a real Vercel deployment with its own unique "throwaway" URL
+      # (NEW_DEPLOYMENT_URL).  Because "Auto-assign Custom Production Domains" is
+      # disabled in the Vercel project settings, this deployment is NOT yet what
+      # sjr-civicfix.vercel.app serves — that aliasing happens in the promote step.
+      #
       # CRITICAL — stdout and stderr MUST be kept separate:
       #   Per Vercel CLI documentation, stdout from `vercel deploy` is always
       #   exactly the deployment URL and nothing else.  Progress/status messages
@@ -113,7 +135,7 @@ jobs:
       - name: Deploy pre-built output
         id: vercel_deploy
         run: |
-          DEPLOY_URL=$(vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN \
+          NEW_DEPLOYMENT_URL=$(vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN \
             2> deploy-error.txt)
           # Echo stderr to the Actions log so any warnings remain visible
           if [ -s deploy-error.txt ]; then
@@ -122,8 +144,8 @@ jobs:
             echo "------------------------"
           fi
           # Trim any trailing whitespace/newline the shell may leave
-          DEPLOY_URL="${DEPLOY_URL%%[[:space:]]}"
-          echo "url=${DEPLOY_URL}" >> "$GITHUB_OUTPUT"
+          NEW_DEPLOYMENT_URL="${NEW_DEPLOYMENT_URL%%[[:space:]]}"
+          echo "new_url=${NEW_DEPLOYMENT_URL}" >> "$GITHUB_OUTPUT"
 
       # ── URL validation ────────────────────────────────────────────────────────
       # Fail fast with a clear message if the captured URL is malformed.
@@ -132,13 +154,13 @@ jobs:
       # indirect failure.
       - name: Validate deployment URL
         env:
-          DEPLOY_URL: ${{ steps.vercel_deploy.outputs.url }}
+          NEW_DEPLOYMENT_URL: ${{ steps.vercel_deploy.outputs.new_url }}
         run: |
-          echo "Captured deployment URL: '${DEPLOY_URL}'"
+          echo "Captured deployment URL: '${NEW_DEPLOYMENT_URL}'"
           # Must start with https://, contain no spaces, and have no trailing text
           # beyond a valid hostname/path (no embedded status words like "Building…")
-          if ! echo "${DEPLOY_URL}" | grep -qE '^https://[^ ]+$'; then
-            echo "❌  Deployment URL is malformed: '${DEPLOY_URL}'"
+          if ! echo "${NEW_DEPLOYMENT_URL}" | grep -qE '^https://[^ ]+$'; then
+            echo "❌  Deployment URL is malformed: '${NEW_DEPLOYMENT_URL}'"
             echo "    Expected a bare https:// URL with no spaces or trailing text."
             echo "    Check the 'Deploy pre-built output' step log for stderr output"
             echo "    from the Vercel CLI that may have merged into the URL."
@@ -146,23 +168,20 @@ jobs:
           fi
           echo "✅  URL looks well-formed."
 
-      # ── Post-deploy health check ──────────────────────────────────────────────
-      # This is a second, independent safety net.  CI passing guarantees the
-      # *code* was correct at test time, but doesn't guarantee the deployed
-      # function won't fail for a runtime-only reason (bad env var, missing
-      # secret, broken edge config, etc.) that CI's environment didn't expose.
-      #
-      # Strategy: retry up to 6 times with a 10-second back-off to absorb
-      # Vercel's edge propagation delay.  Anything 2xx/3xx/4xx is "alive";
-      # only 5xx or an unreachable host fails the workflow.
-      - name: Post-deploy health check
+      # ── Step 2: Health check against NEW_DEPLOYMENT_URL ─────────────────────
+      # Gates the promote step: a broken build should never be aliased to the
+      # custom production domain.  Retries up to 6 times with a 10-second
+      # back-off to absorb Vercel's edge propagation delay.  Anything
+      # 2xx/3xx/4xx is "alive"; only 5xx or an unreachable host fails the job.
+      - name: Health check (new deployment URL)
+        id: health_check
         env:
-          DEPLOY_URL: ${{ steps.vercel_deploy.outputs.url }}
+          NEW_DEPLOYMENT_URL: ${{ steps.vercel_deploy.outputs.new_url }}
         run: |
-          echo "Running health check against ${DEPLOY_URL}"
+          echo "Running health check against ${NEW_DEPLOYMENT_URL}"
           for i in 1 2 3 4 5 6; do
             HTTP_STATUS=$(curl --silent --output /dev/null --write-out "%{http_code}" \
-              --max-time 15 "${DEPLOY_URL}" || echo "000")
+              --max-time 15 "${NEW_DEPLOYMENT_URL}" || echo "000")
             echo "Attempt ${i}: HTTP ${HTTP_STATUS}"
             if [ "$HTTP_STATUS" -ge 500 ] 2>/dev/null; then
               echo "Server returned ${HTTP_STATUS} — deployment is unhealthy."
@@ -170,7 +189,7 @@ jobs:
                 echo "Retrying in 10 s..."
                 sleep 10
               else
-                echo "Health check failed after 6 attempts. Failing workflow."
+                echo "❌  Health check failed after 6 attempts. Aborting — promotion skipped."
                 exit 1
               fi
             elif [ "$HTTP_STATUS" = "000" ]; then
@@ -179,11 +198,62 @@ jobs:
                 echo "Retrying in 10 s..."
                 sleep 10
               else
-                echo "Health check failed after 6 attempts. Failing workflow."
+                echo "❌  Health check failed after 6 attempts. Aborting — promotion skipped."
                 exit 1
               fi
             else
               echo "✅  Health check passed (HTTP ${HTTP_STATUS})."
               exit 0
+            fi
+          done
+
+      # ── Step 3: Promote to custom production domain ───────────────────────────
+      # Because "Auto-assign Custom Production Domains" is disabled in the Vercel
+      # project, `vercel deploy --prod` alone does NOT update what the custom
+      # domain serves.  This explicit promote step is the only way to alias
+      # sjr-civicfix.vercel.app → NEW_DEPLOYMENT_URL.
+      #
+      # --yes bypasses the interactive confirmation prompt (required in CI).
+      # VERCEL_TOKEN is already exported in the job-level env block and is
+      # detected automatically by the CLI — no --token flag needed here.
+      - name: Promote deployment to production domain
+        env:
+          NEW_DEPLOYMENT_URL: ${{ steps.vercel_deploy.outputs.new_url }}
+        run: |
+          echo "Promoting ${NEW_DEPLOYMENT_URL} → sjr-civicfix.vercel.app"
+          vercel promote "${NEW_DEPLOYMENT_URL}" \
+            --yes \
+            --token=$VERCEL_TOKEN
+          echo "✅  Promote command completed."
+
+      # ── Step 4: Post-promotion domain check ──────────────────────────────────
+      # Confirms that sjr-civicfix.vercel.app is now serving the new build, not
+      # just that the promote command exited successfully.  Retries up to 6 times
+      # with a 15-second back-off to allow Vercel's edge network to propagate
+      # the alias before declaring a failure.
+      - name: Post-promotion domain check
+        run: |
+          CUSTOM_DOMAIN="https://sjr-civicfix.vercel.app"
+          echo "Verifying custom domain is live: ${CUSTOM_DOMAIN}"
+          for i in 1 2 3 4 5 6; do
+            HTTP_STATUS=$(curl --silent --output /dev/null --write-out "%{http_code}" \
+              --max-time 20 "${CUSTOM_DOMAIN}" || echo "000")
+            echo "Attempt ${i}: HTTP ${HTTP_STATUS}"
+            if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 500 ] 2>/dev/null; then
+              echo "✅  Custom domain is live (HTTP ${HTTP_STATUS})."
+              exit 0
+            elif [ "$HTTP_STATUS" = "000" ]; then
+              echo "Could not reach ${CUSTOM_DOMAIN}."
+            else
+              echo "Unexpected status ${HTTP_STATUS} from custom domain."
+            fi
+            if [ "$i" -lt 6 ]; then
+              echo "Retrying in 15 s..."
+              sleep 15
+            else
+              echo "❌  Custom domain did not respond successfully after 6 attempts."
+              echo "    Promote may have succeeded but edge propagation is delayed."
+              echo "    Check the Vercel dashboard for the current production alias."
+              exit 1
             fi
           done
