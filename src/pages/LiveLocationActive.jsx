@@ -238,38 +238,35 @@ export default function LiveLocationActive() {
         // New messages become visible only via this panel re-rendering.
         const incoming = json.newMessages ?? [];
         if (incoming.length > 0) {
-          const newMessages = incoming.filter((m) => !seenMsgIds.has(m._id));
+          setSeenMsgIds((prev) => {
+            const newIds = incoming
+              .map((m) => m._id)
+              .filter((mid) => !prev.has(mid));
+            if (!newIds.length) return prev; // nothing actually new — bail
 
-          if (newMessages.length > 0) {
-            // ── CHANGE 1: Advance the ref IMMEDIATELY, not in a callback ────────
-            // This prevents race conditions where two pings fire before the first
-            // callback runs, causing the second ping to re-send lastSeenMessageAtRef
-            // with the OLD (stale) value.
-            const latestMsg = newMessages[newMessages.length - 1];
-            lastSeenMessageAtRef.current = latestMsg.createdAt;
-
-            // ── CHANGE 2: Soft-highlight the newest message (fades after 8 s) ────
+            // Soft-highlight the newest message (fades after 8 s; no sound).
+            const latestMsg = incoming[incoming.length - 1];
             setNewestMsgId(latestMsg._id);
             setTimeout(() => setNewestMsgId(null), 8_000);
 
-            // ── CHANGE 3: Merge into state after advancing the ref ──────────────
-            // If rendering fails, the ref is already advanced — no duplicates.
-            setSeenMsgIds((prev) => {
-              const newIds = newMessages.map((m) => m._id);
-              return new Set([...prev, ...newIds]);
-            });
-
+            // Merge into the displayed list (existing + new, deduped by _id)
             setMessages((prev) => {
               const existingIds = new Set(prev.map((m) => m._id));
-              const truly_new = newMessages.filter((m) => !existingIds.has(m._id));
+              const truly_new = incoming.filter((m) => !existingIds.has(m._id));
               if (!truly_new.length) return prev;
-
               const merged = [...prev, ...truly_new].sort(
-                  (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+                (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
               );
+
+              // Advance the cursor ONLY after the new messages are in state.
+              // If this callback is called, rendering will happen — safe to advance.
+              lastSeenMessageAtRef.current = latestMsg.createdAt;
+
               return merged;
             });
-          }
+
+            return new Set([...prev, ...newIds]);
+          });
         }
       }
     } catch {
@@ -307,56 +304,27 @@ export default function LiveLocationActive() {
       return;
     }
 
-    // ── CHANGE 1: Initialize with session's starting location ────────────────
-    // If no GPS fix has arrived yet, use the location from when the session
-    // was started (passed via nav state or fetched from server).
-    // This ensures the first ping has SOMETHING rather than being skipped.
-    const startingPos = navState.startingLocation ||
-        (expiresAt ? {  // fallback: use data from mount-time fetch
-          coords: { latitude: 6.5244, longitude: 3.3792, accuracy: 100 }
-        } : null);
-
-    if (startingPos) {
-      latestPosRef.current = startingPos;
-    }
-
     // watchPosition — updates latestPosRef on every fix (potentially fast)
-    // ── CHANGE 2: Relax GPS settings for better coverage ────────────────────
-    // - enableHighAccuracy: false = use WiFi/cell triangulation + GPS
-    //   (still gets decent accuracy, much faster fix)
-    // - timeout: 30_000 = give GPS 30 seconds (not 15) to lock on
-    // - maximumAge: 10_000 = accept fixes up to 10 seconds old
     watchIdRef.current = navigator.geolocation.watchPosition(
-        (pos) => {
-          latestPosRef.current = pos;
-          setGeoError(''); // clear any previous geo error on success
-        },
-        (err) => {
-          if (err.code === err.PERMISSION_DENIED) {
-            setGeoError('Location permission revoked. Sharing has paused.');
-            // Still keep the last good position if we have one
-          } else {
-            setGeoError('GPS signal weak — using last known position…');
-            // Do NOT clear latestPosRef — keep last good fix for fallback
-          }
-        },
-        {
-          enableHighAccuracy: false,   // ← CHANGED: use WiFi/cell, not GPS-only
-          timeout: 30_000,             // ← INCREASED: 30 seconds
-          maximumAge: 10_000           // ← INCREASED: accept 10s old fixes
+      (pos) => {
+        latestPosRef.current = pos;
+        setGeoError(''); // clear any previous geo error on success
+      },
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) {
+          setGeoError('Location permission revoked. Sharing has paused.');
+        } else {
+          setGeoError('GPS signal lost — waiting for fix…');
         }
+      },
+      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 5_000 }
     );
 
     // Throttled ping — fires every PING_INTERVAL_MS regardless of how often
     // watchPosition fires.  This is the ONLY place a ping is dispatched.
-    // ── CHANGE 3: Ensure we always have a position to send ─────────────────
     pingTimerRef.current = setInterval(() => {
-      // If we have a position (from GPS or fallback), send it
       if (latestPosRef.current) {
         sendPing(latestPosRef.current);
-      } else {
-        // If still no position after first ping interval, log for debugging
-        console.warn('[LiveLocation] No position yet for ping (watchPosition still waiting)');
       }
     }, PING_INTERVAL_MS);
 
