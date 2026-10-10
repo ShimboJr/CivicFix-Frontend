@@ -57,56 +57,56 @@ function LiveLocationMapDemo() {
       <svg width="100%" height="100%" style={{ position: 'absolute', inset: 0 }}>
         <defs>
           <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(11,79,108,0.08)" strokeWidth="1"/>
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(11,79,108,0.08)" strokeWidth="1" />
           </pattern>
           <radialGradient id="pulseGrad" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#0B4F6C" stopOpacity="0.3"/>
-            <stop offset="100%" stopColor="#0B4F6C" stopOpacity="0"/>
+            <stop offset="0%" stopColor="#0B4F6C" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="#0B4F6C" stopOpacity="0" />
           </radialGradient>
         </defs>
-        <rect width="100%" height="100%" fill="url(#grid)"/>
+        <rect width="100%" height="100%" fill="url(#grid)" />
 
         {/* Road-like lines for map feel */}
-        <line x1="0" y1="140" x2="100%" y2="140" stroke="rgba(255,255,255,0.7)" strokeWidth="12"/>
-        <line x1="0" y1="280" x2="100%" y2="280" stroke="rgba(255,255,255,0.7)" strokeWidth="8"/>
-        <line x1="120" y1="0" x2="120" y2="100%" stroke="rgba(255,255,255,0.7)" strokeWidth="10"/>
-        <line x1="320" y1="0" x2="320" y2="100%" stroke="rgba(255,255,255,0.6)" strokeWidth="7"/>
+        <line x1="0" y1="140" x2="100%" y2="140" stroke="rgba(255,255,255,0.7)" strokeWidth="12" />
+        <line x1="0" y1="280" x2="100%" y2="280" stroke="rgba(255,255,255,0.7)" strokeWidth="8" />
+        <line x1="120" y1="0" x2="120" y2="100%" stroke="rgba(255,255,255,0.7)" strokeWidth="10" />
+        <line x1="320" y1="0" x2="320" y2="100%" stroke="rgba(255,255,255,0.6)" strokeWidth="7" />
 
         {/* Road dashes */}
-        <line x1="0" y1="140" x2="100%" y2="140" stroke="rgba(11,79,108,0.15)" strokeWidth="1" strokeDasharray="20,15"/>
-        <line x1="120" y1="0" x2="120" y2="100%" stroke="rgba(11,79,108,0.15)" strokeWidth="1" strokeDasharray="20,15"/>
+        <line x1="0" y1="140" x2="100%" y2="140" stroke="rgba(11,79,108,0.15)" strokeWidth="1" strokeDasharray="20,15" />
+        <line x1="120" y1="0" x2="120" y2="100%" stroke="rgba(11,79,108,0.15)" strokeWidth="1" strokeDasharray="20,15" />
 
         {/* Building blocks */}
-        <rect x="20" y="20" width="80" height="50" rx="4" fill="rgba(11,79,108,0.06)" stroke="rgba(11,79,108,0.1)" strokeWidth="1"/>
-        <rect x="20" y="170" width="60" height="80" rx="4" fill="rgba(11,79,108,0.06)" stroke="rgba(11,79,108,0.1)" strokeWidth="1"/>
-        <rect x="150" y="20" width="140" height="100" rx="4" fill="rgba(11,79,108,0.06)" stroke="rgba(11,79,108,0.1)" strokeWidth="1"/>
-        <rect x="150" y="170" width="100" height="90" rx="4" fill="rgba(11,79,108,0.06)" stroke="rgba(11,79,108,0.1)" strokeWidth="1"/>
-        <rect x="340" y="20" width="90" height="65" rx="4" fill="rgba(11,79,108,0.06)" stroke="rgba(11,79,108,0.1)" strokeWidth="1"/>
-        <rect x="340" y="170" width="120" height="90" rx="4" fill="rgba(11,79,108,0.06)" stroke="rgba(11,79,108,0.1)" strokeWidth="1"/>
-        <rect x="20" y="300" width="100%" height="80" rx="0" fill="rgba(11,79,108,0.04)"/>
+        <rect x="20" y="20" width="80" height="50" rx="4" fill="rgba(11,79,108,0.06)" stroke="rgba(11,79,108,0.1)" strokeWidth="1" />
+        <rect x="20" y="170" width="60" height="80" rx="4" fill="rgba(11,79,108,0.06)" stroke="rgba(11,79,108,0.1)" strokeWidth="1" />
+        <rect x="150" y="20" width="140" height="100" rx="4" fill="rgba(11,79,108,0.06)" stroke="rgba(11,79,108,0.1)" strokeWidth="1" />
+        <rect x="150" y="170" width="100" height="90" rx="4" fill="rgba(11,79,108,0.06)" stroke="rgba(11,79,108,0.1)" strokeWidth="1" />
+        <rect x="340" y="20" width="90" height="65" rx="4" fill="rgba(11,79,108,0.06)" stroke="rgba(11,79,108,0.1)" strokeWidth="1" />
+        <rect x="340" y="170" width="120" height="90" rx="4" fill="rgba(11,79,108,0.06)" stroke="rgba(11,79,108,0.1)" strokeWidth="1" />
+        <rect x="20" y="300" width="100%" height="80" rx="0" fill="rgba(11,79,108,0.04)" />
 
         {/* Admin watcher marker */}
-        <circle cx="330" cy="260" r="18" fill="rgba(242,165,65,0.15)" stroke="#F2A541" strokeWidth="2"/>
+        <circle cx="330" cy="260" r="18" fill="rgba(242,165,65,0.15)" stroke="#F2A541" strokeWidth="2" />
         <text x="330" y="264" textAnchor="middle" fontSize="14" fill="#F2A541">👮</text>
 
         {/* Animated pulse rings around user */}
         <circle key={`ring1-${pulseKey}`} cx="220" cy="185" r="8" fill="none" stroke="#0B4F6C" strokeWidth="2"
-          style={{ animation: 'liveRingExpand 2s ease-out infinite', opacity: 0 }}/>
+          style={{ animation: 'liveRingExpand 2s ease-out infinite', opacity: 0 }} />
         <circle key={`ring2-${pulseKey}`} cx="220" cy="185" r="8" fill="none" stroke="#0B4F6C" strokeWidth="1.5"
-          style={{ animation: 'liveRingExpand 2s ease-out 0.5s infinite', opacity: 0 }}/>
+          style={{ animation: 'liveRingExpand 2s ease-out 0.5s infinite', opacity: 0 }} />
         <circle key={`ring3-${pulseKey}`} cx="220" cy="185" r="8" fill="none" stroke="#0B4F6C" strokeWidth="1"
-          style={{ animation: 'liveRingExpand 2s ease-out 1s infinite', opacity: 0 }}/>
+          style={{ animation: 'liveRingExpand 2s ease-out 1s infinite', opacity: 0 }} />
 
         {/* Accuracy circle */}
-        <circle cx="220" cy="185" r="35" fill="rgba(11,79,108,0.08)" stroke="rgba(11,79,108,0.2)" strokeWidth="1" strokeDasharray="4,3"/>
+        <circle cx="220" cy="185" r="35" fill="rgba(11,79,108,0.08)" stroke="rgba(11,79,108,0.2)" strokeWidth="1" strokeDasharray="4,3" />
 
         {/* User dot */}
-        <circle cx="220" cy="185" r="10" fill="#0B4F6C" stroke="#fff" strokeWidth="3"/>
-        <circle cx="220" cy="185" r="4" fill="#fff"/>
+        <circle cx="220" cy="185" r="10" fill="#0B4F6C" stroke="#fff" strokeWidth="3" />
+        <circle cx="220" cy="185" r="4" fill="#fff" />
 
         {/* Signal line from user to admin */}
         <line x1="220" y1="185" x2="330" y2="260" stroke="#F2A541" strokeWidth="1.5" strokeDasharray="6,4" opacity="0.6"
-          style={{ animation: 'dashFlow 1.5s linear infinite' }}/>
+          style={{ animation: 'dashFlow 1.5s linear infinite' }} />
       </svg>
 
       {/* Live Status Badge */}
@@ -120,7 +120,7 @@ function LiveLocationMapDemo() {
           width: 8, height: 8, borderRadius: '50%', background: '#4ade80',
           animation: 'liveDot 1.4s ease-in-out infinite',
           boxShadow: '0 0 6px #4ade80',
-        }}/>
+        }} />
         <span style={{ color: '#fff', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em' }}>
           LIVE
         </span>
@@ -137,7 +137,7 @@ function LiveLocationMapDemo() {
         boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
         display: 'flex', alignItems: 'center', gap: '0.4rem',
       }}>
-        <i className="bi bi-arrow-up-circle-fill" style={{ color: '#0B4F6C', fontSize: '0.85rem' }}/>
+        <i className="bi bi-arrow-up-circle-fill" style={{ color: '#0B4F6C', fontSize: '0.85rem' }} />
         <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#0B4F6C' }}>
           {pingCount} pings sent
         </span>
@@ -164,7 +164,7 @@ function LiveLocationMapDemo() {
           </div>
         </div>
         <div style={{ fontSize: '0.7rem', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-          <i className="bi bi-geo-alt-fill" style={{ color: '#0B4F6C' }}/>
+          <i className="bi bi-geo-alt-fill" style={{ color: '#0B4F6C' }} />
           Victoria Island, Lagos
         </div>
       </div>
@@ -176,7 +176,7 @@ function LiveLocationMapDemo() {
         borderRadius: 10, padding: '0.5rem 0.75rem',
         display: 'flex', alignItems: 'center', gap: '0.4rem',
       }}>
-        <i className="bi bi-shield-check-fill" style={{ color: '#F2A541', fontSize: '0.85rem' }}/>
+        <i className="bi bi-shield-check-fill" style={{ color: '#F2A541', fontSize: '0.85rem' }} />
         <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#d4882a' }}>
           Admin monitoring
         </span>
@@ -280,7 +280,7 @@ function FeatureCard({ icon, iconBg, title, description, delay = '0s' }) {
         animation: 'floatUp 3s ease-in-out infinite',
         animationDelay: delay,
       }}>
-        <i className={`bi ${icon}`} style={{ fontSize: '1.4rem', color: '#0B4F6C' }}/>
+        <i className={`bi ${icon}`} style={{ fontSize: '1.4rem', color: '#0B4F6C' }} />
       </div>
       <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '0.45rem', color: 'var(--cf-text)' }}>
         {title}
@@ -305,13 +305,13 @@ function HowItWorksStep({ step, icon, title, description, isLast }) {
           boxShadow: '0 4px 16px rgba(11,79,108,0.3)',
           flexShrink: 0,
         }}>
-          <i className={`bi ${icon}`} style={{ fontSize: '1.1rem' }}/>
+          <i className={`bi ${icon}`} style={{ fontSize: '1.1rem' }} />
         </div>
         {!isLast && (
           <div style={{
             width: 2, height: 40, marginTop: 6,
             background: 'linear-gradient(to bottom, #0B4F6C40, transparent)',
-          }}/>
+          }} />
         )}
       </div>
       <div style={{ paddingTop: '0.7rem' }}>
@@ -344,7 +344,7 @@ function TrustBadge({ icon, label }) {
       border: '1px solid rgba(255,255,255,0.15)',
       borderRadius: 999,
     }}>
-      <i className={`bi ${icon}`} style={{ color: '#F2A541', fontSize: '0.9rem' }}/>
+      <i className={`bi ${icon}`} style={{ color: '#F2A541', fontSize: '0.9rem' }} />
       <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.82rem', fontWeight: 500 }}>
         {label}
       </span>
@@ -366,15 +366,15 @@ export default function Home() {
   }, []);
 
   const display = {
-    totalIssues:    stats ? formatStat(stats.totalIssues)    : FALLBACK.totalIssues,
+    totalIssues: stats ? formatStat(stats.totalIssues) : FALLBACK.totalIssues,
     resolvedIssues: stats ? formatStat(stats.resolvedIssues) : FALLBACK.resolvedIssues,
     activeCitizens: stats ? formatStat(stats.activeCitizens) : FALLBACK.activeCitizens,
   };
 
   const statItems = [
-    { label: 'Issues Reported',  value: display.totalIssues,    icon: 'bi-flag-fill' },
-    { label: 'Issues Resolved',  value: display.resolvedIssues, icon: 'bi-check-circle-fill' },
-    { label: 'Active Citizens',  value: display.activeCitizens, icon: 'bi-people-fill' },
+    { label: 'Issues Reported', value: display.totalIssues, icon: 'bi-flag-fill' },
+    { label: 'Issues Resolved', value: display.resolvedIssues, icon: 'bi-check-circle-fill' },
+    { label: 'Active Citizens', value: display.activeCitizens, icon: 'bi-people-fill' },
   ];
 
   const features = [
@@ -461,12 +461,12 @@ export default function Home() {
           position: 'absolute', width: 400, height: 400, borderRadius: '50%',
           background: 'radial-gradient(circle, rgba(242,165,65,0.12) 0%, transparent 70%)',
           top: -100, right: -80, pointerEvents: 'none',
-        }}/>
+        }} />
         <div style={{
           position: 'absolute', width: 300, height: 300, borderRadius: '50%',
           background: 'radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%)',
           bottom: -60, left: -40, pointerEvents: 'none',
-        }}/>
+        }} />
 
         <div style={{ maxWidth: 1100, margin: '0 auto' }}>
           <div style={{
@@ -487,7 +487,7 @@ export default function Home() {
                 <div style={{
                   width: 7, height: 7, borderRadius: '50%', background: '#4ade80',
                   animation: 'liveDot 1.4s ease-in-out infinite',
-                }}/>
+                }} />
                 NOW LIVE — Real-Time Location Sharing
               </div>
 
@@ -497,7 +497,7 @@ export default function Home() {
                 color: '#fff', marginBottom: '1.25rem',
                 fontFamily: 'var(--cf-font-heading)',
               }}>
-                Your Community.<br/>
+                Your Community.<br />
                 <span style={{
                   background: 'linear-gradient(90deg, #F2A541, #f8c97a)',
                   WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
@@ -526,7 +526,7 @@ export default function Home() {
                     borderRadius: 10,
                   }}
                 >
-                  <i className="bi bi-shield-plus"/>  Get Started Free
+                  <i className="bi bi-shield-plus" />  Get Started Free
                 </Link>
                 <Link
                   to="/issues"
@@ -538,15 +538,15 @@ export default function Home() {
                     borderRadius: 10,
                   }}
                 >
-                  Browse Issues <i className="bi bi-arrow-right"/>
+                  Browse Issues <i className="bi bi-arrow-right" />
                 </Link>
               </div>
 
               {/* Trust indicators */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
-                <TrustBadge icon="bi-lock-fill" label="End-to-end encrypted"/>
-                <TrustBadge icon="bi-geo-alt-fill" label="GPS ±5m accuracy"/>
-                <TrustBadge icon="bi-clock" label="Auto-expires safely"/>
+                <TrustBadge icon="bi-lock-fill" label="End-to-end encrypted" />
+                <TrustBadge icon="bi-geo-alt-fill" label="GPS ±5m accuracy" />
+                <TrustBadge icon="bi-clock" label="Auto-expires safely" />
               </div>
             </div>
 
@@ -572,7 +572,7 @@ export default function Home() {
                 animationDelay: `${0.2 + idx * 0.1}s`,
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginBottom: '0.3rem' }}>
-                  <i className={`bi ${icon}`} style={{ color: '#F2A541', fontSize: '1rem' }}/>
+                  <i className={`bi ${icon}`} style={{ color: '#F2A541', fontSize: '1rem' }} />
                 </div>
                 <div style={{
                   fontSize: 'clamp(1.6rem, 3vw, 2.1rem)', fontWeight: 800,
@@ -601,7 +601,7 @@ export default function Home() {
               fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.05em',
               marginBottom: '1rem',
             }}>
-              <i className="bi bi-broadcast-pin"/> FEATURE SPOTLIGHT
+              <i className="bi bi-broadcast-pin" /> FEATURE SPOTLIGHT
             </div>
             <h2 style={{
               fontSize: 'clamp(1.7rem, 3.5vw, 2.4rem)', fontWeight: 800,
@@ -640,7 +640,7 @@ export default function Home() {
                   width: 14, height: 14, borderRadius: '50%',
                   background: '#16a34a', flexShrink: 0,
                   animation: 'live-ping 1.6s ease-out infinite',
-                }}/>
+                }} />
                 <div style={{ flex: 1 }}>
                   <p style={{ margin: 0, fontWeight: 700, fontSize: '0.95rem', color: '#166534' }}>
                     Live location sharing is active
@@ -664,7 +664,7 @@ export default function Home() {
                 marginBottom: '1.25rem',
                 display: 'flex', gap: '0.65rem', alignItems: 'flex-start',
               }}>
-                <i className="bi bi-exclamation-triangle-fill" style={{ color: '#d97706', marginTop: 2 }}/>
+                <i className="bi bi-exclamation-triangle-fill" style={{ color: '#d97706', marginTop: 2 }} />
                 <p style={{ margin: 0, fontSize: '0.8125rem', color: '#92400e', lineHeight: 1.55 }}>
                   <strong>Keep this page open for sharing to continue.</strong> Web browsers do not
                   reliably track location in the background or with the screen locked.
@@ -675,7 +675,7 @@ export default function Home() {
               <div className="cf-card" style={{ padding: '0.9rem 1.1rem', marginBottom: '1.25rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <i className="bi bi-arrow-up-circle" style={{ color: 'var(--cf-primary)' }}/>
+                    <i className="bi bi-arrow-up-circle" style={{ color: 'var(--cf-primary)' }} />
                     <span style={{ fontSize: '0.8125rem', fontWeight: 600 }}>Location pings sent</span>
                   </div>
                   <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--cf-primary)' }}>22</span>
@@ -694,7 +694,7 @@ export default function Home() {
                   fontWeight: 600, fontSize: '0.85rem', textAlign: 'center',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
                 }}>
-                  <i className="bi bi-shield-check"/> I'm Safe
+                  <i className="bi bi-shield-check" /> I'm Safe
                 </div>
                 <div style={{
                   flex: 1, minWidth: 120,
@@ -703,7 +703,7 @@ export default function Home() {
                   fontWeight: 600, fontSize: '0.85rem', textAlign: 'center',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
                 }}>
-                  <i className="bi bi-clock"/> +15 min
+                  <i className="bi bi-clock" /> +15 min
                 </div>
                 <div style={{
                   flex: 1, minWidth: 120,
@@ -712,7 +712,7 @@ export default function Home() {
                   fontWeight: 600, fontSize: '0.85rem', textAlign: 'center',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
                 }}>
-                  <i className="bi bi-stop-circle"/> Stop
+                  <i className="bi bi-stop-circle" /> Stop
                 </div>
               </div>
             </div>
@@ -756,7 +756,7 @@ export default function Home() {
                       background: item.bg, flexShrink: 0,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
-                      <i className={`bi ${item.icon}`} style={{ color: item.color, fontSize: '1.15rem' }}/>
+                      <i className={`bi ${item.icon}`} style={{ color: item.color, fontSize: '1.15rem' }} />
                     </div>
                     <div>
                       <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.3rem', color: 'var(--cf-text)' }}>
@@ -805,14 +805,14 @@ export default function Home() {
                 fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.05em',
                 marginBottom: '1.25rem',
               }}>
-                <i className="bi bi-map"/> HOW IT WORKS
+                <i className="bi bi-map" /> HOW IT WORKS
               </div>
               <h2 style={{
                 fontSize: 'clamp(1.6rem, 3vw, 2.2rem)', fontWeight: 800,
                 color: 'var(--cf-text)', marginBottom: '0.75rem',
                 fontFamily: 'var(--cf-font-heading)',
               }}>
-                From Report to<br/>
+                From Report to<br />
                 <span style={{ color: 'var(--cf-primary)' }}>Monitored Safety</span>
               </h2>
               <p style={{
@@ -825,7 +825,7 @@ export default function Home() {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
                 {steps.map((s, i) => (
-                  <HowItWorksStep key={s.step} {...s} isLast={i === steps.length - 1}/>
+                  <HowItWorksStep key={s.step} {...s} isLast={i === steps.length - 1} />
                 ))}
               </div>
             </div>
@@ -848,7 +848,7 @@ export default function Home() {
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     marginBottom: '1rem',
                   }}>
-                    <i className="bi bi-shield-shaded" style={{ color: '#F2A541', fontSize: '1.6rem' }}/>
+                    <i className="bi bi-shield-shaded" style={{ color: '#F2A541', fontSize: '1.6rem' }} />
                   </div>
                   <h3 style={{ color: '#fff', margin: '0 0 0.4rem', fontFamily: 'var(--cf-font-heading)' }}>
                     Privacy by Default
@@ -861,11 +861,11 @@ export default function Home() {
                 {/* Privacy commitments */}
                 <div style={{ padding: '1.5rem' }}>
                   {[
-                    { icon: 'bi-lock-fill',         color: '#0B4F6C', text: 'Sessions expire automatically — no location is stored after sharing ends.' },
-                    { icon: 'bi-toggle-on',          color: '#059669', text: 'Sharing is 100% voluntary. You start it, you stop it — no one else can.' },
-                    { icon: 'bi-person-fill-slash',  color: '#7c3aed', text: 'Only authorised monitoring staff can view your live position.' },
-                    { icon: 'bi-database-slash',     color: '#d97706', text: 'Location history is purged from the database when a session ends.' },
-                    { icon: 'bi-eye-slash-fill',     color: '#dc2626', text: 'No passive background tracking. If the page is closed, pings stop instantly.' },
+                    { icon: 'bi-lock-fill', color: '#0B4F6C', text: 'Sessions expire automatically — no location is stored after sharing ends.' },
+                    { icon: 'bi-toggle-on', color: '#059669', text: 'Sharing is 100% voluntary. You start it, you stop it — no one else can.' },
+                    { icon: 'bi-person-fill-slash', color: '#7c3aed', text: 'Only authorised monitoring staff can view your live position.' },
+                    { icon: 'bi-database-slash', color: '#d97706', text: 'Location history is purged from the database when a session ends.' },
+                    { icon: 'bi-eye-slash-fill', color: '#dc2626', text: 'No passive background tracking. If the page is closed, pings stop instantly.' },
                   ].map((item) => (
                     <div key={item.text} style={{
                       display: 'flex', gap: '0.75rem', alignItems: 'flex-start',
@@ -877,7 +877,7 @@ export default function Home() {
                         background: `${item.color}15`,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                       }}>
-                        <i className={`bi ${item.icon}`} style={{ color: item.color, fontSize: '0.9rem' }}/>
+                        <i className={`bi ${item.icon}`} style={{ color: item.color, fontSize: '0.9rem' }} />
                       </div>
                       <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--cf-text-secondary)', lineHeight: 1.6 }}>
                         {item.text}
@@ -890,7 +890,7 @@ export default function Home() {
                     className="cf-btn cf-btn-primary lls-cta-btn"
                     style={{ width: '100%', marginTop: '1.25rem', padding: '0.8rem', justifyContent: 'center', borderRadius: 10 }}
                   >
-                    <i className="bi bi-shield-plus"/> Start Reporting Issues
+                    <i className="bi bi-shield-plus" /> Start Reporting Issues
                   </Link>
                 </div>
               </div>
@@ -911,7 +911,7 @@ export default function Home() {
           backgroundImage: 'radial-gradient(circle at 25% 50%, #fff 1px, transparent 1px), radial-gradient(circle at 75% 50%, #fff 1px, transparent 1px)',
           backgroundSize: '60px 60px',
           pointerEvents: 'none',
-        }}/>
+        }} />
 
         <div style={{ maxWidth: 720, margin: '0 auto', textAlign: 'center', position: 'relative' }}>
           <div style={{
@@ -921,7 +921,7 @@ export default function Home() {
             margin: '0 auto 1.5rem',
             animation: 'floatUp 3s ease-in-out infinite',
           }}>
-            <i className="bi bi-geo-alt-fill" style={{ color: '#F2A541', fontSize: '1.8rem' }}/>
+            <i className="bi bi-geo-alt-fill" style={{ color: '#F2A541', fontSize: '1.8rem' }} />
           </div>
 
           <h2 style={{
@@ -951,10 +951,10 @@ export default function Home() {
                 borderRadius: 10,
               }}
             >
-              <i className="bi bi-person-plus-fill"/> Create Free Account
+              <i className="bi bi-person-plus-fill" /> Create Free Account
             </Link>
             <Link
-              to="/issues"
+              to="/map"
               className="cf-btn lls-cta-btn"
               style={{
                 background: 'rgba(255,255,255,0.1)',
@@ -963,7 +963,7 @@ export default function Home() {
                 borderRadius: 10,
               }}
             >
-              <i className="bi bi-map"/> View Community Map
+              <i className="bi bi-map" /> View Community Map
             </Link>
           </div>
 
@@ -973,9 +973,9 @@ export default function Home() {
             display: 'flex', flexWrap: 'wrap', gap: '0.6rem',
             justifyContent: 'center',
           }}>
-            <TrustBadge icon="bi-people-fill"       label={`${display.activeCitizens} active citizens`}/>
-            <TrustBadge icon="bi-check-circle-fill"  label={`${display.resolvedIssues} issues resolved`}/>
-            <TrustBadge icon="bi-shield-check-fill"  label="Privacy-first design"/>
+            <TrustBadge icon="bi-people-fill" label={`${display.activeCitizens} active citizens`} />
+            <TrustBadge icon="bi-check-circle-fill" label={`${display.resolvedIssues} issues resolved`} />
+            <TrustBadge icon="bi-shield-check-fill" label="Privacy-first design" />
           </div>
         </div>
       </section>
