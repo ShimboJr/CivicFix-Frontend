@@ -136,6 +136,36 @@ export default function PublicNav() {
             </NavLink>
           </li>
 
+          <li className="nav-item">
+            {/* External link — opens in a new tab; rel attrs protect against
+                opener-based attacks while allowing the download page to load. */}
+            <a
+              href="https://drive.google.com/file/d/1tdDvIU7ZTDavCeovHnI7sYjeqYoTccAL/view?usp=drivesdk"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={close}
+              className="nav-link"
+              style={{
+                color: 'rgba(255,255,255,0.82)',
+                fontWeight: 500,
+                fontSize: '0.875rem',
+                textDecoration: 'none',
+                padding: '0.4rem 0',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                borderBottom: '2px solid transparent',
+                transition: 'color 150ms, border-color 150ms',
+                whiteSpace: 'nowrap',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.82)'; }}
+            >
+              <i className="bi bi-android2" style={{ fontSize: '0.95rem', color: '#a4c639' }}/>
+              Download App
+            </a>
+          </li>
+
           {/*
            * Deferred links — uncomment and add routes when pages are built:
            * <li className="nav-item">

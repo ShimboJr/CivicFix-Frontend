@@ -967,13 +967,14 @@ export default function Home() {
             </Link>
           </div>
 
-          {/* Bottom trust row */}
+          {/* Bottom trust row — uses the same `display` object as the stat strip.
+               Falls back to FALLBACK constants until the API response arrives. */}
           <div style={{
             display: 'flex', flexWrap: 'wrap', gap: '0.6rem',
             justifyContent: 'center',
           }}>
-            <TrustBadge icon="bi-people-fill"       label="12,000+ active citizens"/>
-            <TrustBadge icon="bi-check-circle-fill"  label="1,800+ issues resolved"/>
+            <TrustBadge icon="bi-people-fill"       label={`${display.activeCitizens} active citizens`}/>
+            <TrustBadge icon="bi-check-circle-fill"  label={`${display.resolvedIssues} issues resolved`}/>
             <TrustBadge icon="bi-shield-check-fill"  label="Privacy-first design"/>
           </div>
         </div>
