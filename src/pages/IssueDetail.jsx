@@ -373,7 +373,7 @@ export default function IssueDetail() {
                           {formatDate(c.createdAt)}
                         </span>
                       </div>
-                      <p style={{ margin: 0, fontSize: '0.875rem', lineHeight: 1.6, color: 'var(--cf-text)' }}>
+                      <p style={{ margin: 0, fontSize: '0.875rem', lineHeight: 1.6, color: 'var(--cf-text)', overflowWrap: 'break-word', wordBreak: 'break-word' }}>
                         {c.text}
                       </p>
                     </div>

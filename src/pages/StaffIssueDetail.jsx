@@ -340,7 +340,7 @@ export default function StaffIssueDetail() {
                         )}
                         <span style={{ fontSize: '0.75rem', color: 'var(--cf-text-muted)', marginLeft: 'auto' }}>{formatDate(c.createdAt)}</span>
                       </div>
-                      <p style={{ margin: 0, fontSize: '0.875rem', lineHeight: 1.6 }}>{c.text}</p>
+                      <p style={{ margin: 0, fontSize: '0.875rem', lineHeight: 1.6, overflowWrap: 'break-word', wordBreak: 'break-word' }}>{c.text}</p>
                     </div>
                   </div>
                 ))}
