@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" role="img" aria-label="CivicFix mark">
+  <!--
+    CivicFix logo-mark.svg — "Civic Anchor Ring" mark
+    Concept: A location teardrop whose body opens into a community arc.
+    The pin head carries a small crosshair dot (the "Fix" action).
+    The open ring at the top signals accessibility and community, not a closed seal.
+
+    Construction grid: 48×48 viewBox
+    Stroke weight: 1.75 (matches Lucide icon set convention)
+    Corner radius: 2.5 — consistent with Lucide rounded-line style
+    Primary colour: #0B4F6C  /  Accent: #D97706
+  -->
+
+  <!-- Outer community arc (open ring — not a closed government seal) -->
+  <!-- Arc sweeps from ~210° to ~330° — open at top, echoing the pin tip -->
+  <path
+    d="M 12.5 20 A 11.5 11.5 0 1 1 35.5 20"
+    stroke="#0B4F6C"
+    stroke-width="1.75"
+    stroke-linecap="round"
+    fill="none"
+  />
+
+  <!-- Location pin teardrop body -->
+  <!-- The circle center at (24, 20), r=7. Teardrop tip points down at y=34 -->
+  <path
+    d="M 17 20 A 7 7 0 0 1 31 20 C 31 26.5 24 34 24 34 C 24 34 17 26.5 17 20 Z"
+    fill="#0B4F6C"
+  />
+
+  <!-- Inner crosshair dot — white on the pin face (the "Fix" focus point) -->
+  <circle cx="24" cy="20" r="2.5" fill="#ffffff" />
+
+  <!-- Subtle inner ring accent — teal tint for depth at larger sizes -->
+  <circle
+    cx="24"
+    cy="20"
+    r="4.5"
+    stroke="rgba(255,255,255,0.30)"
+    stroke-width="1"
+    fill="none"
+  />
+
+  <!-- Two small accent dots on the open arc ends — community nodes -->
+  <circle cx="12.5" cy="20" r="2" fill="#D97706" />
+  <circle cx="35.5" cy="20" r="2" fill="#D97706" />
+</svg>

@@ -2,13 +2,38 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+
+    <!-- Favicon — SVG (modern browsers) -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <!-- PWA: iOS home screen icon (180×180, Safari doesn't read the manifest icons) -->
-    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <!-- Favicon — 32×32 PNG fallback (older browsers, desktop shortcuts) -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+
+    <!-- PWA: iOS home screen icon (180×180, Safari ignores the manifest icons) -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+
     <!-- PWA: browser chrome / splash screen colour matching the brand teal -->
     <meta name="theme-color" content="#0B4F6C" />
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CivicFix</title>
+    <title>CivicFix — Report Issues & Stay Safe in Your Community</title>
+    <meta name="description" content="Report local civic issues, track their resolution, and share your live GPS location with safety monitors in an emergency. CivicFix keeps your community connected and informed." />
+
+    <!-- Open Graph -->
+    <meta property="og:type"        content="website" />
+    <meta property="og:url"         content="https://civicfix.vercel.app/" />
+    <meta property="og:title"       content="CivicFix — Community Issue Reporting & Personal Safety" />
+    <meta property="og:description" content="Report potholes, broken streetlights, water leaks and more. In emergencies, share your real-time GPS location with a trusted monitoring team." />
+    <meta property="og:image"       content="/og-image.png" />
+    <meta property="og:image:width"  content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt"   content="CivicFix — Report issues. Stay safe. Strengthen your community." />
+
+    <!-- Twitter / X Card -->
+    <meta name="twitter:card"        content="summary_large_image" />
+    <meta name="twitter:title"       content="CivicFix — Community Issue Reporting & Personal Safety" />
+    <meta name="twitter:description" content="Report potholes, broken streetlights, water leaks and more. In emergencies, share your real-time GPS location with a trusted monitoring team." />
+    <meta name="twitter:image"       content="/og-image.png" />
+    <meta name="twitter:image:alt"   content="CivicFix — Report issues. Stay safe. Strengthen your community." />
   </head>
   <body>
     <div id="root"></div>

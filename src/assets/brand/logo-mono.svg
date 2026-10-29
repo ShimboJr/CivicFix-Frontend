@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" role="img" aria-label="CivicFix mark">
+  <!--
+    logo-mono.svg — single colour mark using currentColor.
+    Drop into any element where colour is set via CSS color property.
+    The accent dots also use currentColor so the whole mark scales with one colour.
+  -->
+
+  <!-- Open community arc -->
+  <path
+    d="M 12.5 20 A 11.5 11.5 0 1 1 35.5 20"
+    stroke="currentColor"
+    stroke-width="1.75"
+    stroke-linecap="round"
+    fill="none"
+  />
+
+  <!-- Pin teardrop -->
+  <path
+    d="M 17 20 A 7 7 0 0 1 31 20 C 31 26.5 24 34 24 34 C 24 34 17 26.5 17 20 Z"
+    fill="currentColor"
+  />
+
+  <!-- Inner white dot — stays white so the pin reads as a face at any colour -->
+  <circle cx="24" cy="20" r="2.5" fill="white" />
+
+  <!-- Inner ring accent — slightly transparent currentColor -->
+  <circle
+    cx="24"
+    cy="20"
+    r="4.5"
+    stroke="currentColor"
+    stroke-opacity="0.25"
+    stroke-width="1"
+    fill="none"
+  />
+
+  <!-- Community node dots — also currentColor -->
+  <circle cx="12.5" cy="20" r="2" fill="currentColor" />
+  <circle cx="35.5" cy="20" r="2" fill="currentColor" />
+</svg>

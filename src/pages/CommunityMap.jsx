@@ -22,6 +22,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import api from '../services/api';
 import StatusBadge from '../components/StatusBadge';
+import Logo from '../components/Brand/Logo';
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
 const LAGOS_CENTER  = [6.5244, 3.3792];
@@ -139,16 +140,7 @@ export default function CommunityMap() {
         justifyContent: 'space-between', flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          <div style={{
-            width: 34, height: 34, background: 'rgba(255,255,255,0.15)',
-            borderRadius: 8, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', color: '#fff', fontSize: '1rem',
-          }}>
-            <i className="bi bi-building-check" />
-          </div>
-          <span style={{ fontFamily: 'var(--cf-font-heading)', fontWeight: 700, fontSize: '1.15rem', color: '#fff' }}>
-            Civic<span style={{ color: 'var(--cf-accent)' }}>Fix</span>
-          </span>
+          <Logo variant="full" size={30} reversed />
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>

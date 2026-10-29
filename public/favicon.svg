@@ -1,24 +1,41 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
-    <!--
-      CivicFix favicon — building-check glyph (Bootstrap Icons) on brand background.
-      Background colour: #0B4F6C (CSS variable cf-primary from client/src/index.css :root)
-      Glyph paths: verbatim from bootstrap-icons/icons/building-check.svg (16×16 viewBox),
-                   scaled to fit within a 32×32 canvas with 4px padding on each side
-                   (i.e. glyph occupies a 24×24 area starting at x=4, y=4).
-    -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none" role="img" aria-label="CivicFix">
+  <!--
+    CivicFix favicon.svg
+    32×32 viewBox — optimised for 16–64 px rendering.
+    At 16 px: the teal pin body reads as a clear location marker.
+    At 32 px: the open arc and amber dots are fully legible.
 
-    <!-- Rounded-square background -->
-    <rect width="32" height="32" rx="7" ry="7" fill="#0B4F6C"/>
+    The mark is centered in a rounded-square teal background for
+    app-icon contexts (browser tab, bookmarks).
+  -->
 
-    <!--
-      The original paths are drawn on a 16×16 viewBox.
-      We want the glyph to fill roughly 24×24 of the 32×32 canvas (4px inset each side).
-      Scale factor = 24/16 = 1.5, then translate by (4, 4).
-      Applied as: transform="translate(4,4) scale(1.5)"
-    -->
-    <g transform="translate(4,4) scale(1.5)" fill="#ffffff">
-        <path d="M12.5 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7m1.679-4.493-1.335 2.226a.75.75 0 0 1-1.174.144l-.774-.773a.5.5 0 0 1 .708-.708l.547.548 1.17-1.951a.5.5 0 1 1 .858.514"/>
-        <path d="M2 1a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6.5a.5.5 0 0 1-1 0V1H3v14h3v-2.5a.5.5 0 0 1 .5-.5H8v4H3a1 1 0 0 1-1-1z"/>
-        <path d="M4.5 2a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm3 0a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm3 0a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm-6 3a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm3 0a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm3 0a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm-6 3a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm3 0a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5z"/>
-    </g>
+  <!-- Rounded-square background -->
+  <rect width="32" height="32" rx="7" ry="7" fill="#0B4F6C"/>
+
+  <!--
+    Mark scaled to fit: original 48×48 viewBox scaled to ~28×28 (87.5%)
+    then centered: translate((32-28)/2, (32-28)/2) = translate(2, 2)
+    scale(28/48) = scale(0.583)
+    Combined: translate(2,2) scale(0.583)
+  -->
+  <g transform="translate(2,2) scale(0.583)">
+    <!-- Open community arc — white on dark bg -->
+    <path
+      d="M 12.5 20 A 11.5 11.5 0 1 1 35.5 20"
+      stroke="#ffffff"
+      stroke-width="2.5"
+      stroke-linecap="round"
+      fill="none"
+    />
+    <!-- Pin teardrop — white -->
+    <path
+      d="M 17 20 A 7 7 0 0 1 31 20 C 31 26.5 24 34 24 34 C 24 34 17 26.5 17 20 Z"
+      fill="#ffffff"
+    />
+    <!-- Inner dot — teal -->
+    <circle cx="24" cy="20" r="2.5" fill="#0B4F6C"/>
+    <!-- Community node dots — amber -->
+    <circle cx="12.5" cy="20" r="2.5" fill="#D97706"/>
+    <circle cx="35.5" cy="20" r="2.5" fill="#D97706"/>
+  </g>
 </svg>

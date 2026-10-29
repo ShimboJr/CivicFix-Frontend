@@ -24,13 +24,12 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import NotificationBell from './NotificationBell';
 import SOSButton from './SOSButton';
+import Logo from './Brand/Logo';
 
 // ── Per-role sidebar configuration ───────────────────────────────────────────
 const ROLE_CONFIG = {
   resident: {
     sidebarBg:    'var(--cf-primary)',          // deep civic teal
-    logoIconBg:   'rgba(255,255,255,0.15)',
-    logoIcon:     'bi-building-check',
     sectionLabel: 'Resident Portal',
     avatarBg:     'var(--cf-accent)',
     nav: [
@@ -44,8 +43,6 @@ const ROLE_CONFIG = {
   },
   admin: {
     sidebarBg:    '#0d1b2a',
-    logoIconBg:   'var(--cf-accent)',
-    logoIcon:     'bi-shield-check',
     sectionLabel: 'Management',
     avatarBg:     'var(--cf-accent)',
     nav: [
@@ -60,8 +57,6 @@ const ROLE_CONFIG = {
   },
   staff: {
     sidebarBg:    '#1a3a2a',
-    logoIconBg:   '#10b981',
-    logoIcon:     'bi-tools',
     sectionLabel: 'My Work',
     avatarBg:     '#10b981',
     nav: [
@@ -159,22 +154,10 @@ function SidebarLogo({ cfg }) {
   return (
     <div style={{ padding: '1.4rem 1.25rem 1rem', borderBottom: '1px solid rgba(255,255,255,0.09)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-        <div style={{
-          width: 32, height: 32, borderRadius: 7,
-          background: cfg.logoIconBg,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff', fontSize: '0.95rem',
-        }}>
-          <i className={`bi ${cfg.logoIcon}`} />
-        </div>
-        <div>
-          <div style={{ fontFamily: 'var(--cf-font-heading)', fontWeight: 700, fontSize: '1.05rem', color: '#fff' }}>
-            Civic<span style={{ color: 'var(--cf-accent)' }}>Fix</span>
-          </div>
-          <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-            {cfg.sectionLabel}
-          </div>
-        </div>
+        <Logo variant="full" size={28} reversed />
+      </div>
+      <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '0.35rem' }}>
+        {cfg.sectionLabel}
       </div>
     </div>
   );
@@ -274,8 +257,8 @@ export default function DashboardLayout({ children, title }) {
         </button>
 
         {/* Brand */}
-        <span style={{ flex: 1, fontFamily: 'var(--cf-font-heading)', fontWeight: 700, fontSize: '1.1rem', color: '#fff' }}>
-          Civic<span style={{ color: 'var(--cf-accent)' }}>Fix</span>
+        <span style={{ flex: 1 }}>
+          <Logo variant="full" size={26} reversed />
         </span>
 
         {/* Bell + avatar — keep accessible on mobile */}
@@ -330,17 +313,7 @@ export default function DashboardLayout({ children, title }) {
           flexShrink: 0,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <div style={{
-              width: 28, height: 28, borderRadius: 6,
-              background: cfg.logoIconBg,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#fff', fontSize: '0.85rem',
-            }}>
-              <i className={`bi ${cfg.logoIcon}`} />
-            </div>
-            <span style={{ fontFamily: 'var(--cf-font-heading)', fontWeight: 700, fontSize: '1rem', color: '#fff' }}>
-              Civic<span style={{ color: 'var(--cf-accent)' }}>Fix</span>
-            </span>
+            <Logo variant="full" size={26} reversed />
           </div>
 
           <button

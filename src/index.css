@@ -156,34 +156,18 @@ img { max-width: 100%; display: block; }
 .cf-auth-logo {
   display:         flex;
   align-items:     center;
-  gap:             var(--cf-space-sm);
+  justify-content: center;
   margin-bottom:   var(--cf-space-xl);
-  justify-content: center;
 }
 
-.cf-auth-logo .logo-icon {
-  width:           40px;
-  height:          40px;
-  background:      var(--cf-primary);
-  border-radius:   var(--cf-radius-md);
-  display:         flex;
-  align-items:     center;
-  justify-content: center;
-  color:           white;
-  font-size:       1.2rem;
-}
-
-.cf-auth-logo .logo-text {
-  font-family: var(--cf-font-heading);
-  font-weight: 700;
-  font-size:   1.4rem;
-  color:       var(--cf-primary);
-  letter-spacing: -0.3px;
-}
-
-.cf-auth-logo .logo-text span {
-  color: var(--cf-accent);
-}
+/*
+  .logo-icon and .logo-text are no longer emitted by the Logo component.
+  The Logo JSX renders its own inline-SVG mark + wordmark.
+  These stubs are kept as empty rules so any legacy reference compiles cleanly.
+*/
+.cf-auth-logo .logo-icon  {}
+.cf-auth-logo .logo-text  {}
+.cf-auth-logo .logo-text span {}
 
 .cf-form-label {
   font-size:   0.8125rem;

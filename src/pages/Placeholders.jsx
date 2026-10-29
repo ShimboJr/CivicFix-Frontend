@@ -3,6 +3,7 @@
 
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import Logo from '../components/Brand/Logo';
 
 function PlaceholderPage({ icon, title, description, route }) {
   const { logout } = useAuth();
@@ -16,8 +17,7 @@ function PlaceholderPage({ icon, title, description, route }) {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <span style={{ fontFamily: 'var(--cf-font-heading)', fontWeight: 700, color: 'var(--cf-primary)' }}>
-          <i className="bi bi-building-check me-2"></i>
-          Civic<span style={{ color: 'var(--cf-accent)' }}>Fix</span>
+          <Logo variant="full" size={26} />
           <span style={{ fontSize: '0.75rem', color: 'var(--cf-text-muted)', marginLeft: '0.6rem', fontWeight: 400 }}>
             {route}
           </span>

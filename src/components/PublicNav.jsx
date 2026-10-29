@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Link, NavLink } from 'react-router-dom';
+import Logo from './Brand/Logo';
 
 /**
  * PublicNav — top navigation bar for logged-out visitors.
@@ -68,24 +69,7 @@ export default function PublicNav() {
         onClick={close}
         style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', textDecoration: 'none', padding: 0 }}
       >
-        <div style={{
-          width: 32, height: 32,
-          background: 'rgba(255,255,255,0.15)',
-          borderRadius: 8,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff', fontSize: '1rem',
-        }}>
-          <i className="bi bi-building-check" />
-        </div>
-        <span style={{
-          fontFamily:    'var(--cf-font-heading)',
-          fontWeight:    700,
-          fontSize:      '1.15rem',
-          color:         '#fff',
-          letterSpacing: '-0.2px',
-        }}>
-          Civic<span style={{ color: 'var(--cf-accent)' }}>Fix</span>
-        </span>
+      <Logo variant="full" size={30} reversed />
       </Link>
 
       {/* ── Hamburger toggler (hidden at lg+, visible below lg) ────────────── */}

@@ -48,6 +48,25 @@ export default defineConfig({
         scope:            '/',
         icons: [
           {
+            src:   '/icons/icon-192.png',
+            sizes: '192x192',
+            type:  'image/png',
+          },
+          {
+            src:   '/icons/icon-512.png',
+            sizes: '512x512',
+            type:  'image/png',
+          },
+          {
+            // Maskable variant — safe-zone padding applied so the mark
+            // stays inside the inner-80% circle on Android adaptive icons.
+            src:     '/icons/maskable-512.png',
+            sizes:   '512x512',
+            type:    'image/png',
+            purpose: 'maskable',
+          },
+          // Legacy aliases kept for any older cached SW manifests
+          {
             src:   '/icons/pwa-192x192.png',
             sizes: '192x192',
             type:  'image/png',
@@ -56,15 +75,6 @@ export default defineConfig({
             src:   '/icons/pwa-512x512.png',
             sizes: '512x512',
             type:  'image/png',
-          },
-          {
-            // Maskable variant uses the same 512×512 PNG.
-            // The brand background already fills the full canvas so the safe
-            // zone (inner 80%) shows the icon without clipping on Android.
-            src:     '/icons/pwa-512x512.png',
-            sizes:   '512x512',
-            type:    'image/png',
-            purpose: 'maskable',
           },
         ],
       },

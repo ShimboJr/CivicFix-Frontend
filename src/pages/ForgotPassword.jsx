@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
+import Logo from '../components/Brand/Logo';
 
 /**
  * ForgotPassword — single email-input form.
@@ -44,10 +45,7 @@ export default function ForgotPassword() {
 
         {/* Logo */}
         <div className="cf-auth-logo">
-          <div className="logo-icon">
-            <i className="bi bi-building-check"></i>
-          </div>
-          <span className="logo-text">Civic<span>Fix</span></span>
+          <Logo variant="full" size={38} />
         </div>
 
         <h1 style={{ fontSize: '1.35rem', textAlign: 'center', marginBottom: '0.25rem' }}>

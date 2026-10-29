@@ -11,6 +11,9 @@ import 'leaflet/dist/leaflet.css';
 // ── Leaflet default-icon fix for Vite bundler ─────────────────────────────────
 import './utils/leafletIconFix.js';
 
+// ── CivicFix brand design tokens (colours, radii, shadows) ────────────────────
+import './styles/brand.css';
+
 // ── CivicFix global design system (overrides & custom tokens) ────────────────
 import './index.css';
 

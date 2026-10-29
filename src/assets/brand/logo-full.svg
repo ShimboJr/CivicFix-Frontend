@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 48" fill="none" role="img" aria-label="CivicFix">
+  <!--
+    CivicFix logo-full.svg — mark + wordmark
+    viewBox: 200×48
+    Mark occupies 0–48, wordmark starts at x=56
+  -->
+
+  <!-- ── Mark (same as logo-mark.svg, anchored top-left) ──────────────── -->
+  <path
+    d="M 12.5 20 A 11.5 11.5 0 1 1 35.5 20"
+    stroke="#0B4F6C"
+    stroke-width="1.75"
+    stroke-linecap="round"
+    fill="none"
+  />
+  <path
+    d="M 17 20 A 7 7 0 0 1 31 20 C 31 26.5 24 34 24 34 C 24 34 17 26.5 17 20 Z"
+    fill="#0B4F6C"
+  />
+  <circle cx="24" cy="20" r="2.5" fill="#ffffff" />
+  <circle cx="24" cy="20" r="4.5" stroke="rgba(11,79,108,0.20)" stroke-width="1" fill="none" />
+  <circle cx="12.5" cy="20" r="2" fill="#D97706" />
+  <circle cx="35.5" cy="20" r="2" fill="#D97706" />
+
+  <!-- ── Wordmark ───────────────────────────────────────────────────────── -->
+  <!-- "Civic" in brand primary, "Fix" in accent amber -->
+  <!-- Font: DM Sans 700 rendered as text element; browsers use system font -->
+  <text
+    x="56"
+    y="30"
+    font-family="'DM Sans', 'Inter', system-ui, sans-serif"
+    font-size="22"
+    font-weight="700"
+    letter-spacing="-0.4"
+    fill="#0B4F6C"
+  >Civic</text>
+  <text
+    x="117"
+    y="30"
+    font-family="'DM Sans', 'Inter', system-ui, sans-serif"
+    font-size="22"
+    font-weight="700"
+    letter-spacing="-0.4"
+    fill="#D97706"
+  >Fix</text>
+</svg>
