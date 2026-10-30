@@ -39,27 +39,27 @@ export default function PublicNav() {
   // The border-bottom shows as a text-underline on mobile (acceptable) and as a
   // tab-style underline indicator on the desktop horizontal bar (intended).
   const navLinkStyle = ({ isActive }) => ({
-    color:          isActive ? '#fff' : 'rgba(255,255,255,0.82)',
-    fontWeight:     isActive ? 600 : 500,
-    fontSize:       '0.875rem',
+    color: isActive ? '#fff' : 'rgba(255,255,255,0.82)',
+    fontWeight: isActive ? 600 : 500,
+    fontSize: '0.875rem',
     textDecoration: 'none',
-    padding:        '0.4rem 0',
-    paddingBottom:  isActive ? 'calc(0.4rem - 2px)' : '0.4rem',  // compensate for border height
-    display:        'block',
-    borderBottom:   isActive ? '2px solid var(--cf-accent)' : '2px solid transparent',
-    transition:     'color 150ms, border-color 150ms',
+    padding: '0.4rem 0',
+    paddingBottom: isActive ? 'calc(0.4rem - 2px)' : '0.4rem',  // compensate for border height
+    display: 'block',
+    borderBottom: isActive ? '2px solid var(--cf-accent)' : '2px solid transparent',
+    transition: 'color 150ms, border-color 150ms',
   });
 
   return (
     <nav
       className="navbar navbar-expand-lg"
       style={{
-        background:  'var(--cf-primary)',
-        position:    'sticky',
-        top:         0,
-        zIndex:      200,
-        boxShadow:   'var(--cf-shadow-md)',
-        padding:     '0.4rem 1.5rem',
+        background: 'var(--cf-primary)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 200,
+        boxShadow: 'var(--cf-shadow-md)',
+        padding: '0.4rem 1.5rem',
       }}
     >
       {/* ── Brand ──────────────────────────────────────────────────────────── */}
@@ -69,7 +69,7 @@ export default function PublicNav() {
         onClick={close}
         style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', textDecoration: 'none', padding: 0 }}
       >
-      <Logo variant="full" size={30} reversed />
+        <Logo variant="full" size={30} reversed />
       </Link>
 
       {/* ── Hamburger toggler (hidden at lg+, visible below lg) ────────────── */}
@@ -82,13 +82,13 @@ export default function PublicNav() {
         aria-label={open ? 'Close navigation' : 'Open navigation'}
         onClick={() => setOpen((v) => !v)}
         style={{
-          background:  'rgba(255,255,255,0.1)',
-          border:      '1px solid rgba(255,255,255,0.28)',
+          background: 'rgba(255,255,255,0.1)',
+          border: '1px solid rgba(255,255,255,0.28)',
           borderRadius: 6,
-          padding:     '0.32rem 0.58rem',
-          cursor:      'pointer',
-          lineHeight:  1,
-          boxShadow:   'none',   /* suppress Bootstrap's focus ring colour */
+          padding: '0.32rem 0.58rem',
+          cursor: 'pointer',
+          lineHeight: 1,
+          boxShadow: 'none',   /* suppress Bootstrap's focus ring colour */
         }}
       >
         {/* Swap icon so the button communicates its current state */}
@@ -124,7 +124,7 @@ export default function PublicNav() {
             {/* External link — opens in a new tab; rel attrs protect against
                 opener-based attacks while allowing the download page to load. */}
             <a
-              href="https://drive.google.com/file/d/1tdDvIU7ZTDavCeovHnI7sYjeqYoTccAL/view?usp=drivesdk"
+              href="https://drive.google.com/file/d/1gouG9jG1kxNzCSUR9SajV44f3O_xktPt/view?usp=drivesdk"
               target="_blank"
               rel="noopener noreferrer"
               onClick={close}
@@ -145,7 +145,7 @@ export default function PublicNav() {
               onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; }}
               onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.82)'; }}
             >
-              <i className="bi bi-android2" style={{ fontSize: '0.95rem', color: '#a4c639' }}/>
+              <i className="bi bi-android2" style={{ fontSize: '0.95rem', color: '#a4c639' }} />
               Download App
             </a>
           </li>
@@ -171,16 +171,16 @@ export default function PublicNav() {
             to="/login"
             onClick={close}
             style={{
-              color:        'rgba(255,255,255,0.85)',
-              fontSize:     '0.875rem',
-              fontWeight:   500,
+              color: 'rgba(255,255,255,0.85)',
+              fontSize: '0.875rem',
+              fontWeight: 500,
               textDecoration: 'none',
-              padding:      '0.45rem 0.9rem',
+              padding: '0.45rem 0.9rem',
               borderRadius: 'var(--cf-radius-md)',
-              border:       '1.5px solid rgba(255,255,255,0.3)',
-              transition:   'all var(--cf-transition)',
-              display:      'inline-block',
-              whiteSpace:   'nowrap',
+              border: '1.5px solid rgba(255,255,255,0.3)',
+              transition: 'all var(--cf-transition)',
+              display: 'inline-block',
+              whiteSpace: 'nowrap',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
