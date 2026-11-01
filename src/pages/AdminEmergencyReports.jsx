@@ -11,27 +11,24 @@
  *   ├─────────────────────────────────────────────────────────┤
  *   │  Other Reports  (Acknowledged / Escalated / Resolved /  │
  *   │                  False Alarm)                           │
- *   │  [Compact list rows]                                    │
+ *   │  [Compact list rows + Load More pagination]             │
  *   └─────────────────────────────────────────────────────────┘
  *
- * Each 'New' card shows:
- *   - Type (bold, red)
- *   - Age since submission — reports > 10 min old with no acknowledgment
- *     show a red "⚠ X min old — not yet acknowledged" warning badge
- *   - Description
- *   - Location (address + lat/lng)
- *   - Reporter name + email
- *   - Media (image thumbnail or video player)
- *   - [Acknowledge] button (primary action, most prominent)
- *   - [Status] dropdown → Escalated / Resolved / False Alarm
- *
- * Auto-refresh every 60 seconds so admins on the page see new reports
- * without manual reload.
+ * Performance improvements over the previous version:
+ *   1. Paginated API: GET /api/emergency-reports?page=N&limit=20
+ *      - 'New' reports always fully returned (safety: admins must see all urgent)
+ *      - 'Other' reports paginated server-side; "Load More" on client
+ *   2. Batch live-ids: GET /api/emergency-reports/live-ids
+ *      - Replaces N parallel GET /live-location/by-report/:id calls with ONE
+ *      - Server does a single MongoDB query across LiveLocationSession collection
+ *   3. Skeleton loaders instead of blank white screen during fetch
  *
  * API endpoints used:
- *   GET  /api/emergency-reports           → getAllEmergencyReports (admin only)
+ *   GET  /api/emergency-reports?page=N&limit=L  → paginated getAllEmergencyReports
+ *   GET  /api/emergency-reports/live-ids        → batch live session check
+ *   GET  /api/emergency-reports/stats           → operational stats strip
  *   PUT  /api/emergency-reports/:id/acknowledge → acknowledge
- *   PUT  /api/emergency-reports/:id/status     → update status
+ *   PUT  /api/emergency-reports/:id/status      → update status
  */
 
 import { useEffect, useState, useCallback, useRef } from 'react';
@@ -40,13 +37,11 @@ import api from '../services/api';
 import DashboardLayout from '../components/DashboardLayout';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const STALE_MINUTES = 10; // reports older than this (if still New) get a warning
-const REFRESH_MS    = 60_000; // auto-refresh interval
+const STALE_MINUTES  = 10;       // reports older than this (if still New) get a warning
+const REFRESH_MS     = 60_000;   // auto-refresh interval
+const PAGE_LIMIT     = 20;       // rows per page for "Other Reports"
 
 const VALID_STATUSES = ['Acknowledged', 'Escalated', 'Resolved', 'False Alarm'];
-
-// Ordinal sort for the "other" section (non-New)
-const STATUS_ORDER = { Acknowledged: 0, Escalated: 1, Resolved: 2, 'False Alarm': 3 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function minutesAgo(dateStr) {
@@ -62,10 +57,52 @@ function formatAge(dateStr) {
   return r ? `${h}h ${r}m ago` : `${h}h ago`;
 }
 
-// ── Subcomponent: operational stats strip ────────────────────────────────────
-// Deliberately plain and factual — this is a monitoring readout, not an
-// analytics dashboard. No chart colors, no animations (except the stale-count
-// warning accent which should catch the admin's eye for operational reasons).
+// ── Skeleton loaders ──────────────────────────────────────────────────────────
+function SkeletonCard() {
+  return (
+    <div style={{
+      background:   '#fff',
+      border:       '2px solid #f1f5f9',
+      borderRadius: 'var(--cf-radius-lg)',
+      padding:      '1.25rem 1.5rem',
+      marginBottom: '1rem',
+    }}>
+      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>
+        <div className="cf-skeleton" style={{ width: 120, height: 28, borderRadius: 999 }} />
+        <div className="cf-skeleton" style={{ width: 80,  height: 28, borderRadius: 999 }} />
+      </div>
+      <div className="cf-skeleton" style={{ width: '90%', height: 16, marginBottom: '0.5rem' }} />
+      <div className="cf-skeleton" style={{ width: '60%', height: 16, marginBottom: '1rem' }} />
+      <div style={{ display: 'flex', gap: '0.75rem' }}>
+        <div className="cf-skeleton" style={{ width: 130, height: 38, borderRadius: 8 }} />
+        <div className="cf-skeleton" style={{ width: 150, height: 38, borderRadius: 8 }} />
+      </div>
+    </div>
+  );
+}
+
+function SkeletonRow() {
+  return (
+    <div style={{
+      display:      'flex',
+      alignItems:   'center',
+      gap:          '0.75rem',
+      padding:      '0.7rem 1rem',
+      borderRadius: 'var(--cf-radius-md)',
+      border:       '1px solid var(--cf-border-light)',
+      background:   'var(--cf-surface)',
+      marginBottom: '0.45rem',
+    }}>
+      <div className="cf-skeleton" style={{ width: 100, height: 22, borderRadius: 999 }} />
+      <div className="cf-skeleton" style={{ flex: 1, height: 16 }} />
+      <div className="cf-skeleton" style={{ width: 80,  height: 16 }} />
+      <div className="cf-skeleton" style={{ width: 60,  height: 16 }} />
+      <div className="cf-skeleton" style={{ width: 90,  height: 28, borderRadius: 6 }} />
+    </div>
+  );
+}
+
+// ── Subcomponent: operational stats strip ─────────────────────────────────────
 function StatsStrip({ stats, loading }) {
   if (loading && !stats) {
     return (
@@ -91,7 +128,6 @@ function StatsStrip({ stats, loading }) {
   const { avgAckMinutes, staleNewCount, byType } = stats;
   const isStale = staleNewCount > 0;
 
-  // Card shared style
   const cardBase = {
     flex:          '1 1 160px',
     padding:       '0.75rem 1rem',
@@ -142,11 +178,11 @@ function StatsStrip({ stats, loading }) {
         </p>
       </div>
 
-      {/* Card 2 — stale unacknowledged count (warning accent when > 0) */}
+      {/* Card 2 — stale unacknowledged count */}
       <div style={{
         ...cardBase,
-        background: isStale ? '#fff5f5'                    : 'var(--cf-surface)',
-        border:     isStale ? '1.5px solid #fca5a5'        : '1px solid var(--cf-border-light)',
+        background: isStale ? '#fff5f5'             : 'var(--cf-surface)',
+        border:     isStale ? '1.5px solid #fca5a5' : '1px solid var(--cf-border-light)',
       }}>
         <p style={{
           margin:      '0 0 0.25rem',
@@ -233,7 +269,7 @@ function StatsStrip({ stats, loading }) {
   );
 }
 
-// ── Subcomponent: media attachment (image or video) ───────────────────────────
+// ── Subcomponent: media attachment ───────────────────────────────────────────
 function MediaAttachment({ item, idx }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -295,7 +331,7 @@ function NewReportCard({ report, onAcknowledge, onStatusChange, actionLoading, h
         transition: 'box-shadow 300ms',
       }}
     >
-      {/* ── Top row: type + age ─────────────────────────────────────────── */}
+      {/* ── Top row ──────────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
         {/* Type badge */}
         <div style={{
@@ -314,7 +350,7 @@ function NewReportCard({ report, onAcknowledge, onStatusChange, actionLoading, h
           {report.type}
         </div>
 
-        {/* LIVE badge — only when an active LiveLocationSession is linked */}
+        {/* LIVE badge */}
         {hasLive && (
           <span style={{
             display:      'inline-flex',
@@ -339,7 +375,6 @@ function NewReportCard({ report, onAcknowledge, onStatusChange, actionLoading, h
         {/* Age indicator */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           {stale ? (
-            /* Stale warning — cannot be missed */
             <span style={{
               display:      'inline-flex',
               alignItems:   'center',
@@ -367,24 +402,21 @@ function NewReportCard({ report, onAcknowledge, onStatusChange, actionLoading, h
             </span>
           )}
 
-          {/* Report ID */}
           <span style={{ fontSize: '0.73rem', color: 'var(--cf-text-muted)', fontFamily: 'monospace' }}>
             #{String(report._id).slice(-8).toUpperCase()}
           </span>
         </div>
       </div>
 
-      {/* ── Body grid ──────────────────────────────────────────────────────── */}
+      {/* ── Body grid ────────────────────────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '0.75rem 1.5rem' }}>
 
-        {/* Description */}
         <div style={{ gridColumn: '1 / -1' }}>
           <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--cf-text)', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
             {report.description}
           </p>
         </div>
 
-        {/* Location */}
         <div>
           <p style={{ margin: '0 0 0.2rem', fontSize: '0.73rem', fontWeight: 700, color: 'var(--cf-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             <i className="bi bi-geo-alt-fill me-1" style={{ color: '#dc2626' }} />Location
@@ -409,7 +441,6 @@ function NewReportCard({ report, onAcknowledge, onStatusChange, actionLoading, h
           )}
         </div>
 
-        {/* Reporter */}
         <div>
           <p style={{ margin: '0 0 0.2rem', fontSize: '0.73rem', fontWeight: 700, color: 'var(--cf-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             <i className="bi bi-person-fill me-1" style={{ color: '#dc2626' }} />Reporter
@@ -426,7 +457,6 @@ function NewReportCard({ report, onAcknowledge, onStatusChange, actionLoading, h
           )}
         </div>
 
-        {/* Media */}
         {report.media?.length > 0 && (
           <div style={{ gridColumn: '1 / -1' }}>
             <p style={{ margin: '0 0 0.35rem', fontSize: '0.73rem', fontWeight: 700, color: 'var(--cf-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -441,10 +471,9 @@ function NewReportCard({ report, onAcknowledge, onStatusChange, actionLoading, h
         )}
       </div>
 
-      {/* ── Action row ─────────────────────────────────────────────────────── */}
+      {/* ── Action row ──────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '1.1rem', flexWrap: 'wrap' }}>
 
-        {/* Acknowledge — most prominent action on a New report */}
         <button
           id={`er-ack-${report._id}`}
           onClick={() => onAcknowledge(report._id)}
@@ -474,14 +503,13 @@ function NewReportCard({ report, onAcknowledge, onStatusChange, actionLoading, h
           Acknowledge
         </button>
 
-        {/* Status dropdown → skip 'New' and 'Acknowledged' (that's what the btn does) */}
         <select
           id={`er-status-${report._id}`}
           defaultValue=""
           disabled={actionLoading === report._id}
           onChange={(e) => {
             if (e.target.value) onStatusChange(report._id, e.target.value);
-            e.target.value = ''; // reset so it stays a prompt
+            e.target.value = '';
           }}
           style={{
             padding:      '0.55rem 0.85rem',
@@ -501,7 +529,6 @@ function NewReportCard({ report, onAcknowledge, onStatusChange, actionLoading, h
           <option value="False Alarm">False Alarm</option>
         </select>
 
-        {/* View Details — always visible regardless of status */}
         <Link
           to={`/admin/emergency-reports/${report._id}`}
           style={{
@@ -569,7 +596,7 @@ function OtherReportRow({ report, onStatusChange, actionLoading, hasLive }) {
         {report.status}
       </span>
 
-      {/* LIVE badge for non-New rows */}
+      {/* LIVE badge */}
       {hasLive && (
         <span style={{
           display:      'inline-flex',
@@ -591,22 +618,18 @@ function OtherReportRow({ report, onStatusChange, actionLoading, hasLive }) {
         </span>
       )}
 
-      {/* Type */}
       <span style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--cf-text)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {report.type}
       </span>
 
-      {/* Reporter */}
       <span style={{ fontSize: '0.78rem', color: 'var(--cf-text-secondary)', flexShrink: 0 }}>
         <i className="bi bi-person me-1" />{report.reporter?.name ?? '—'}
       </span>
 
-      {/* Age */}
       <span style={{ fontSize: '0.73rem', color: 'var(--cf-text-muted)', flexShrink: 0 }}>
         {formatAge(report.createdAt)}
       </span>
 
-      {/* Status dropdown */}
       {report.status !== 'Resolved' && report.status !== 'False Alarm' && (
         <select
           id={`er-row-status-${report._id}`}
@@ -638,7 +661,6 @@ function OtherReportRow({ report, onStatusChange, actionLoading, hasLive }) {
           style={{ width: 14, height: 14, borderWidth: 2, flexShrink: 0 }} />
       )}
 
-      {/* View Details — always visible regardless of status */}
       <Link
         to={`/admin/emergency-reports/${report._id}`}
         style={{
@@ -669,80 +691,29 @@ function OtherReportRow({ report, onStatusChange, actionLoading, hasLive }) {
 
 // ── Main page component ───────────────────────────────────────────────────────
 export default function AdminEmergencyReports() {
-  const [reports,       setReports]       = useState([]);
-  const [loading,       setLoading]       = useState(true);
-  const [error,         setError]         = useState('');
-  const [actionLoading, setActionLoading] = useState(null); // report._id being mutated
-  const [actionError,   setActionError]   = useState('');   // per-action error message
+  // ── Report state: separated into New (always full) and paginated Others ──
+  const [newReports,   setNewReports]   = useState([]);
+  const [otherReports, setOtherReports] = useState([]);
+  const [pagination,   setPagination]   = useState({ page: 1, limit: PAGE_LIMIT, total: 0, totalPages: 1 });
 
-  // ── Stats state — fetched independently so the strip loads even if the
-  // report list is slow, and refreshes in sync with the report auto-refresh.
+  const [loading,      setLoading]      = useState(true);   // initial / full refresh
+  const [moreLoading,  setMoreLoading]  = useState(false);  // "Load More" button
+
+  const [error,         setError]         = useState('');
+  const [actionLoading, setActionLoading] = useState(null);
+  const [actionError,   setActionError]   = useState('');
+
   const [stats,        setStats]        = useState(null);
   const [statsLoading, setStatsLoading] = useState(true);
 
-  // ── Live session ids — Set of report._id strings that have an active session
-  // Populated asynchronously after each fetchReports, using Promise.allSettled
-  // so one failing query never blocks the rest.  The set is used to render
-  // the LIVE badge on cards without blocking the main report list render.
+  // liveIds: Set<string> of report._id strings with an active live session.
+  // Populated by a SINGLE batch call to /emergency-reports/live-ids instead
+  // of N parallel calls to /live-location/by-report/:id.
   const [liveIds, setLiveIds] = useState(new Set());
 
   const refreshTimer = useRef(null);
 
-  // ── Data fetching ──────────────────────────────────────────────────────────
-  const fetchStats = useCallback(async () => {
-    try {
-      const res = await api.get('/emergency-reports/stats');
-      setStats(res.data);
-    } catch {
-      // Non-fatal: silently skip stats on error; the report list still shows
-    } finally {
-      setStatsLoading(false);
-    }
-  }, []);
-
-  const fetchReports = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    setError('');
-    try {
-      const res = await api.get('/emergency-reports');
-      const data = res.data;
-      setReports(data);
-
-      // ── Check which reports have an active live session ─────────────────
-      // Run in parallel, silently ignore failures (badge absence is non-critical).
-      const checks = data.map((r) =>
-        api.get(`/live-location/by-report/${r._id}`)
-          .then(({ data: d }) => (d.session ? r._id : null))
-          .catch(() => null)
-      );
-      const results = await Promise.allSettled(checks);
-      const ids = new Set(
-        results
-          .filter((r) => r.status === 'fulfilled' && r.value != null)
-          .map((r) => r.value)
-      );
-      setLiveIds(ids);
-    } catch (err) {
-      setError(err.message || 'Failed to load emergency reports.');
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    // Fire both fetches in parallel on mount
-    fetchReports();
-    fetchStats();
-
-    // Auto-refresh every 60 s — re-runs both so the stats strip stays in sync
-    refreshTimer.current = setInterval(() => {
-      fetchReports(true);
-      fetchStats();
-    }, REFRESH_MS);
-    return () => clearInterval(refreshTimer.current);
-  }, [fetchReports, fetchStats]);
-
-  // Inject pulse-border animation once
+  // ── Inject CSS animations once ──────────────────────────────────────────
   useEffect(() => {
     const styleId = 'er-admin-styles';
     if (!document.getElementById(styleId)) {
@@ -757,22 +728,104 @@ export default function AdminEmergencyReports() {
           0%,100% { opacity: 1; }
           50%      { opacity: 0.65; }
         }
+        .cf-skeleton {
+          background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+          background-size: 200% 100%;
+          animation: cf-shimmer 1.4s ease-in-out infinite;
+          border-radius: 4px;
+          display: block;
+        }
+        @keyframes cf-shimmer {
+          0%   { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
       `;
       document.head.appendChild(style);
     }
   }, []);
 
-  // ── Actions ────────────────────────────────────────────────────────────
+  // ── Stats fetch ─────────────────────────────────────────────────────────
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await api.get('/emergency-reports/stats');
+      setStats(res.data);
+    } catch {
+      // Non-fatal: silently skip stats on error
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
+
+  // ── Batch live-ids fetch ─────────────────────────────────────────────────
+  // ONE request replaces N parallel /live-location/by-report/:id calls.
+  const fetchLiveIds = useCallback(async () => {
+    try {
+      const res = await api.get('/emergency-reports/live-ids');
+      setLiveIds(new Set(res.data.liveReportIds ?? []));
+    } catch {
+      // Non-critical: badge absence is acceptable on failure
+    }
+  }, []);
+
+  // ── Primary report fetch (page 1, replaces all current data) ───────────
+  const fetchReports = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    setError('');
+    try {
+      const res = await api.get(`/emergency-reports?page=1&limit=${PAGE_LIMIT}`);
+      const { newReports: nr, otherReports: or, pagination: pg } = res.data;
+      setNewReports(nr   ?? []);
+      setOtherReports(or ?? []);
+      setPagination(pg   ?? { page: 1, limit: PAGE_LIMIT, total: 0, totalPages: 1 });
+    } catch (err) {
+      setError(err.message || 'Failed to load emergency reports.');
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, []);
+
+  // ── "Load More" handler — appends next page to otherReports ────────────
+  const loadMoreOther = useCallback(async () => {
+    const nextPage = pagination.page + 1;
+    if (nextPage > pagination.totalPages) return;
+    setMoreLoading(true);
+    try {
+      const res = await api.get(`/emergency-reports?page=${nextPage}&limit=${PAGE_LIMIT}`);
+      const { otherReports: or, pagination: pg } = res.data;
+      setOtherReports((prev) => [...prev, ...(or ?? [])]);
+      setPagination(pg ?? pagination);
+    } catch (err) {
+      setActionError(`Could not load more reports: ${err.message}`);
+    } finally {
+      setMoreLoading(false);
+    }
+  }, [pagination]);
+
+  // ── Mount: fire all three fetches in parallel ───────────────────────────
+  useEffect(() => {
+    Promise.all([fetchReports(), fetchStats(), fetchLiveIds()]);
+
+    // Auto-refresh: reset to page 1 (silent) + refresh stats + live-ids
+    refreshTimer.current = setInterval(() => {
+      fetchReports(true);
+      fetchStats();
+      fetchLiveIds();
+    }, REFRESH_MS);
+
+    return () => clearInterval(refreshTimer.current);
+  }, [fetchReports, fetchStats, fetchLiveIds]);
+
+  // ── Actions ──────────────────────────────────────────────────────────────
   const handleAcknowledge = async (id) => {
     setActionError('');
     setActionLoading(id);
     try {
-      const res = await api.put(`/emergency-reports/${id}/acknowledge`);
-      // The endpoint returns either the plain document (normal path) or
-      // { message, report } (idempotent path — report was already acknowledged).
+      const res  = await api.put(`/emergency-reports/${id}/acknowledge`);
       const updated = res.data?.report ?? res.data;
-      setReports((prev) => prev.map((r) => r._id === id ? updated : r));
-      // Refresh stats so avg ack time and stale count update immediately
+
+      // Move from newReports → otherReports (optimistic UI update)
+      setNewReports((prev) => prev.filter((r) => r._id !== id));
+      setOtherReports((prev) => [updated, ...prev]);
       fetchStats();
     } catch (err) {
       setActionError(`Could not acknowledge report: ${err.message}`);
@@ -786,8 +839,11 @@ export default function AdminEmergencyReports() {
     setActionLoading(id);
     try {
       const res = await api.put(`/emergency-reports/${id}/status`, { status });
-      setReports((prev) => prev.map((r) => r._id === id ? res.data : r));
-      // Refresh stats after any status change
+      const updated = res.data;
+
+      // Update in whichever list it currently lives in
+      setNewReports((prev)   => prev.map((r)   => r._id === id ? updated : r));
+      setOtherReports((prev) => prev.map((r)   => r._id === id ? updated : r));
       fetchStats();
     } catch (err) {
       setActionError(`Could not update status: ${err.message}`);
@@ -796,26 +852,20 @@ export default function AdminEmergencyReports() {
     }
   };
 
-  // ── Partition into 'New' vs everything else ────────────────────────────────
-  const newReports   = reports.filter((r) => r.status === 'New');
-  const otherReports = reports
-    .filter((r) => r.status !== 'New')
-    .sort((a, b) => (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9)
-      || new Date(b.createdAt) - new Date(a.createdAt));
-
-  const staleCount = newReports.filter((r) => minutesAgo(r.createdAt) >= STALE_MINUTES).length;
+  // ── Derived counts ───────────────────────────────────────────────────────
+  const staleCount      = newReports.filter((r) => minutesAgo(r.createdAt) >= STALE_MINUTES).length;
+  const hasMoreOther    = pagination.page < pagination.totalPages;
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <DashboardLayout title="Emergency Reports">
 
-      {/* ── Operational stats strip ───────────────────────────────────── */}
+      {/* ── Operational stats strip ──────────────────────────────────────── */}
       <StatsStrip stats={stats} loading={statsLoading} />
 
-      {/* ── Page header ───────────────────────────────────────────────── */}
+      {/* ── Page header ──────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
 
-        {/* Unacknowledged badge */}
         {newReports.length > 0 && (
           <span style={{
             display:      'inline-flex',
@@ -836,7 +886,7 @@ export default function AdminEmergencyReports() {
 
         {/* Manual refresh */}
         <button
-          onClick={() => fetchReports()}
+          onClick={() => { fetchReports(); fetchStats(); fetchLiveIds(); }}
           disabled={loading}
           style={{
             display:      'inline-flex',
@@ -860,7 +910,7 @@ export default function AdminEmergencyReports() {
         </button>
       </div>
 
-      {/* ── Global action error ────────────────────────────────────────────── */}
+      {/* ── Global action error ───────────────────────────────────────────── */}
       {actionError && (
         <div className="cf-alert cf-alert-error" style={{ marginBottom: '1rem' }}>
           <i className="bi bi-exclamation-circle-fill" style={{ flexShrink: 0 }} />
@@ -873,15 +923,7 @@ export default function AdminEmergencyReports() {
         </div>
       )}
 
-      {/* ── Loading state ──────────────────────────────────────────────────── */}
-      {loading && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '2rem 0', color: 'var(--cf-text-muted)' }}>
-          <div className="cf-spinner" />
-          Loading emergency reports…
-        </div>
-      )}
-
-      {/* ── Error state ────────────────────────────────────────────────────── */}
+      {/* ── Error state ───────────────────────────────────────────────────── */}
       {!loading && error && (
         <div className="cf-alert cf-alert-error">
           <i className="bi bi-exclamation-circle-fill" style={{ flexShrink: 0 }} />
@@ -889,8 +931,33 @@ export default function AdminEmergencyReports() {
         </div>
       )}
 
-      {/* ── Empty state ────────────────────────────────────────────────────── */}
-      {!loading && !error && reports.length === 0 && (
+      {/* ── Initial skeleton loaders (first load only) ────────────────────── */}
+      {loading && (
+        <>
+          {/* Skeleton for urgent section */}
+          <div style={{
+            display:      'flex',
+            alignItems:   'center',
+            gap:          '0.6rem',
+            marginBottom: '0.85rem',
+            paddingBottom:'0.6rem',
+            borderBottom: '2px solid #f1f5f9',
+          }}>
+            <div className="cf-skeleton" style={{ width: 200, height: 20 }} />
+          </div>
+          <SkeletonCard />
+          <SkeletonCard />
+
+          {/* Skeleton for other reports section */}
+          <div style={{ marginTop: '2rem' }}>
+            <div className="cf-skeleton" style={{ width: 140, height: 18, marginBottom: '0.75rem' }} />
+            {[...Array(5)].map((_, i) => <SkeletonRow key={i} />)}
+          </div>
+        </>
+      )}
+
+      {/* ── Empty state ───────────────────────────────────────────────────── */}
+      {!loading && !error && newReports.length === 0 && otherReports.length === 0 && (
         <div className="cf-card" style={{ textAlign: 'center', padding: '2.5rem 1.5rem', color: 'var(--cf-text-muted)' }}>
           <i className="bi bi-shield-check" style={{ fontSize: '2.5rem', color: '#10b981', display: 'block', marginBottom: '0.75rem' }} />
           <p style={{ fontWeight: 600, margin: '0 0 0.25rem' }}>No emergency reports</p>
@@ -901,7 +968,6 @@ export default function AdminEmergencyReports() {
       {/* ── Section A: Unacknowledged (New) ──────────────────────────────── */}
       {!loading && newReports.length > 0 && (
         <section style={{ marginBottom: '2rem' }}>
-          {/* Section heading */}
           <div style={{
             display:      'flex',
             alignItems:   'center',
@@ -939,7 +1005,7 @@ export default function AdminEmergencyReports() {
         </section>
       )}
 
-      {/* ── Section B: Other reports ──────────────────────────────────────── */}
+      {/* ── Section B: Other reports (paginated) ─────────────────────────── */}
       {!loading && otherReports.length > 0 && (
         <section>
           <div style={{
@@ -958,8 +1024,14 @@ export default function AdminEmergencyReports() {
               borderRadius: '999px', padding: '0 0.5rem',
               fontSize: '0.73rem', fontWeight: 700, color: 'var(--cf-text-muted)',
             }}>
-              {otherReports.length}
+              {pagination.total}
             </span>
+            {/* Show how many pages are loaded */}
+            {pagination.totalPages > 1 && (
+              <span style={{ fontSize: '0.7rem', color: 'var(--cf-text-muted)', marginLeft: '0.15rem' }}>
+                — showing {otherReports.length} of {pagination.total}
+              </span>
+            )}
           </div>
 
           {otherReports.map((report) => (
@@ -971,11 +1043,55 @@ export default function AdminEmergencyReports() {
               hasLive={liveIds.has(report._id)}
             />
           ))}
+
+          {/* Skeleton rows while loading next page */}
+          {moreLoading && (
+            <>
+              <SkeletonRow />
+              <SkeletonRow />
+              <SkeletonRow />
+            </>
+          )}
+
+          {/* Load More button */}
+          {hasMoreOther && !moreLoading && (
+            <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+              <button
+                onClick={loadMoreOther}
+                style={{
+                  display:      'inline-flex',
+                  alignItems:   'center',
+                  gap:          '0.45rem',
+                  padding:      '0.55rem 1.5rem',
+                  border:       '1.5px solid var(--cf-border)',
+                  borderRadius: 'var(--cf-radius-md)',
+                  background:   'var(--cf-surface)',
+                  color:        'var(--cf-text-secondary)',
+                  fontSize:     '0.84rem',
+                  fontWeight:   600,
+                  cursor:       'pointer',
+                  transition:   'border-color 150ms, color 150ms',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--cf-primary)'; e.currentTarget.style.color = 'var(--cf-primary)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--cf-border)'; e.currentTarget.style.color = 'var(--cf-text-secondary)'; }}
+              >
+                <i className="bi bi-chevron-down" />
+                Load more ({pagination.total - otherReports.length} remaining)
+              </button>
+            </div>
+          )}
+
+          {/* End-of-list indicator */}
+          {!hasMoreOther && pagination.totalPages > 1 && (
+            <p style={{ fontSize: '0.72rem', color: 'var(--cf-text-muted)', marginTop: '0.75rem', textAlign: 'center' }}>
+              All {pagination.total} reports loaded
+            </p>
+          )}
         </section>
       )}
 
-      {/* ── Auto-refresh notice ───────────────────────────────────────────── */}
-      {!loading && reports.length > 0 && (
+      {/* ── Auto-refresh notice ────────────────────────────────────────────── */}
+      {!loading && (newReports.length > 0 || otherReports.length > 0) && (
         <p style={{ fontSize: '0.72rem', color: 'var(--cf-text-muted)', marginTop: '1.25rem', textAlign: 'right' }}>
           <i className="bi bi-arrow-repeat me-1" />
           Page auto-refreshes every 60 s &nbsp;·&nbsp; Last loaded: {new Date().toLocaleTimeString()}
