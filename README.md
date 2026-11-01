@@ -56,31 +56,35 @@ The frontend provides an intuitive interface for **Residents, Staff, and Adminis
 
 ### 🏠 Homepage
 
-![CivicFix Homepage](./screenshots/homepage.jpg)
+![CivicFix Homepage](./screenshots/homepage.png)
 
 ### 🌍 Community Issues
 
-![Community Issues](./screenshots/community-issues.jpg)
+![Community Issues](./screenshots/community-issues.png)
 
 ### 📝 Report an Issue
 
-![Report an Issue](./screenshots/report-issue.jpg)
+![Report an Issue](./screenshots/report-issue.png)
 
 ### 👤 Resident Dashboard
 
-![Resident Dashboard](./screenshots/resident-dashboard.jpg)
+![Resident Dashboard](./screenshots/resident-dashboard.png)
 
 ### 👨‍💼 Administrator Dashboard
 
-![Administrator Dashboard](./screenshots/admin-dashboard.jpg)
+![Administrator Dashboard](./screenshots/admin-dashboard.png)
 
 ### 🧑‍🔧 Staff Dashboard
 
-![Staff Dashboard](./screenshots/staff-dashboard.jpg)
+![Staff Dashboard](./screenshots/staff-dashboard.png)
 
 ### 🚨 Emergency Reporting
 
-![Emergency Reporting](./screenshots/emergency-report.jpg)
+![Emergency Reporting](./screenshots/emergency-report.png)
+
+### 🌍 Community Map
+
+![Community Map](./screenshots/community-map.png)
 
 ### 📍 Live Location Sharing
 
