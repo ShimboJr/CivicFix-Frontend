@@ -90,7 +90,7 @@ The frontend provides an intuitive interface for **Residents, Staff, and Adminis
 
 During a personal-safety emergency, residents can activate live location sharing so authorized administrators can monitor their current location and movement history.
 
-![Live Location Sharing](./screenshots/live-location-sharing.jpg)
+![Live Location Sharing](./screenshots/live-location-sharing.png)
 
 ---
 
