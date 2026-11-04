@@ -27,6 +27,9 @@ import Logo from './Brand/Logo';
  * Do NOT apply this nav to any authenticated route — those use DashboardLayout /
  * AdminLayout / StaffLayout which carry their own sidebar navigation.
  */
+/** Current Android APK version — bump this whenever a new build is uploaded. */
+const ANDROID_APP_VERSION = 'v1.0.0';
+
 export default function PublicNav() {
   const [open, setOpen] = useState(false);
 
@@ -123,31 +126,67 @@ export default function PublicNav() {
           <li className="nav-item">
             {/* External link — opens in a new tab; rel attrs protect against
                 opener-based attacks while allowing the download page to load. */}
-            <a
-              href="https://drive.google.com/file/d/1gouG9jG1kxNzCSUR9SajV44f3O_xktPt/view?usp=drivesdk"
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={close}
-              className="nav-link"
-              style={{
-                color: 'rgba(255,255,255,0.82)',
-                fontWeight: 500,
-                fontSize: '0.875rem',
-                textDecoration: 'none',
-                padding: '0.4rem 0',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.35rem',
-                borderBottom: '2px solid transparent',
-                transition: 'color 150ms, border-color 150ms',
-                whiteSpace: 'nowrap',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.82)'; }}
-            >
-              <i className="bi bi-android2" style={{ fontSize: '0.95rem', color: '#a4c639' }} />
-              Download App
-            </a>
+            {/*
+              Wrapper is `position:relative` so the version badge can be pinned
+              to the top-right corner of the link text via `position:absolute`.
+              `display:inline-block` keeps the wrapper tight around the anchor.
+            */}
+            <span style={{ position: 'relative', display: 'inline-block' }}>
+              <a
+                href="https://drive.google.com/file/d/1gouG9jG1kxNzCSUR9SajV44f3O_xktPt/view?usp=drivesdk"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={close}
+                className="nav-link"
+                style={{
+                  color: 'rgba(255,255,255,0.82)',
+                  fontWeight: 500,
+                  fontSize: '0.875rem',
+                  textDecoration: 'none',
+                  padding: '0.4rem 0',
+                  paddingRight: '0.25rem',   /* tiny right breathing room for the badge */
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  borderBottom: '2px solid transparent',
+                  transition: 'color 150ms, border-color 150ms',
+                  whiteSpace: 'nowrap',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.82)'; }}
+              >
+                <i className="bi bi-android2" style={{ fontSize: '0.95rem', color: '#a4c639' }} />
+                Download App
+              </a>
+
+              {/* ── Version badge ─────────────────────────────────────────────
+                  Pinned to the top-right of the wrapper span.
+                  Uses the accent colour so it harmonises with the navbar palette
+                  without clashing with either the Android green icon or the white text.
+              ─────────────────────────────────────────────────────────────── */}
+              <span
+                aria-label={`Android app version ${ANDROID_APP_VERSION}`}
+                title={`Android app version ${ANDROID_APP_VERSION}`}
+                style={{
+                  position: 'absolute',
+                  top: '-4px',
+                  right: '-28px',
+                  background: 'var(--cf-accent)',
+                  color: '#fff',
+                  fontSize: '0.58rem',
+                  fontWeight: 700,
+                  lineHeight: 1,
+                  letterSpacing: '0.02em',
+                  padding: '2px 5px',
+                  borderRadius: '20px',
+                  pointerEvents: 'none',   /* don't interfere with link clicks */
+                  userSelect: 'none',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {ANDROID_APP_VERSION}
+              </span>
+            </span>
           </li>
 
           {/*

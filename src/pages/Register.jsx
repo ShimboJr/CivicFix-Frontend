@@ -96,7 +96,9 @@ export default function Register() {
 
         {/* Logo */}
         <div className="cf-auth-logo">
-          <Logo variant="full" size={38} />
+          <Link to="/">
+            <Logo variant="full" size={38} />
+          </Link>
         </div>
 
         <h1 style={{ fontSize: '1.35rem', textAlign: 'center', marginBottom: '0.25rem' }}>
