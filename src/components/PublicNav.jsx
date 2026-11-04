@@ -133,7 +133,7 @@ export default function PublicNav() {
             */}
             <span style={{ position: 'relative', display: 'inline-block' }}>
               <a
-                href="https://drive.google.com/file/d/1gouG9jG1kxNzCSUR9SajV44f3O_xktPt/view?usp=drivesdk"
+                href="https://drive.google.com/file/d/1zyGQ2FlItsAu-g3ANz4zLL_J3ds6A9Bq/view?usp=drivesdk"
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={close}
